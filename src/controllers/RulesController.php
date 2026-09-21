@@ -305,11 +305,27 @@ class RulesController extends Controller
         return [$request, $ruleUid];
     }
 
-    /** Parses the posted `expiresAt` into a UTC datetime string, or null when blank. */
+    /** Parses the posted `expiresAt` into a UTC datetime string for storage, or null when blank. */
     private function postedExpiry(): ?string
     {
-        $dt = DateTimeHelper::toDateTime(Craft::$app->getRequest()->getBodyParam('expiresAt'));
-        return $dt ? Db::prepareDateForDb($dt) : null;
+        $v = Craft::$app->getRequest()->getBodyParam('expiresAt');
+
+        // The code-management UI posts a bare `YYYY-MM-DD` from an <input
+        // type=date>. Interpret it in the SYSTEM time zone (not UTC) and pin it to
+        // the END of that day: "expires Oct 1" then means end of Oct 1 locally.
+        // Parsed as UTC midnight instead, it displays as the day before in any
+        // zone west of UTC, and — because the list re-posts the displayed date —
+        // the expiry walks back a day on every save. A full datetime is honoured
+        // as given.
+        $dt = DateTimeHelper::toDateTime($v, true);
+        if ($dt === false) {
+            return null;
+        }
+        if (is_string($v) && preg_match('/^\s*\d{4}-\d{2}-\d{2}\s*$/', $v)) {
+            $dt->setTime(23, 59, 59);
+        }
+
+        return Db::prepareDateForDb($dt);
     }
 
     /**
