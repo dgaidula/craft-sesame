@@ -47,3 +47,21 @@ All P0 SECURITY hardening (items 1-4) now complete + verified on the testbed (11
 - **Testbed Pro-edition gotcha:** `switchEdition()` / `savePluginSettings()` from `ddev craft shell` (psysh) do NOT persist — the REPL skips the request-shutdown project-config flush. Force it: `$pc=Craft::$app->getProjectConfig(); $pc->set('plugins.sesame.edition','pro'); $pc->saveModifiedConfigData();`. This is the clean successor to the overnight "edition flip didn't reach the web" note — no `ddev restart` needed, just the explicit flush + verify in a fresh process.
 - **Item 4 #9 unrecoverable:** findings #6/#7 of the FIRST security review are not in the repo and that thread isn't available to this session (only the 8-finding summary row survives, above). Left unrecorded — cannot fabricate them.
 - Remaining: **5** Lite line (gate pattern rules to Pro in actionSave + README pitch/pricing — packaging judgment), **6** de-client README/comments, **7** final gate test + fresh security pass, then P1.
+
+### 2026-09-17→18 (cont.) — items 5-7 done, single orchestrator Opus 4.8 (1M)[high]
+- **Item 5 CODE** `cc9a1a6` — Lite authoring gate (pattern rules → Pro in actionSave; enforcement untouched; edit screen trims + locks grandfathered pattern rules). 6/6 HTTP.
+- **Item 6 CODE** `97031f6` — de-cliented comments + CP examples. (README prose pitch = separate copy pass.)
+- **Packaging assessment** — Fable clverify (verifier, model fable): 140.8k tok, 34 tools, 436s. Verdicts: keep patterns→Pro; ADJUST pitch to lead with magic links; HOLD $49+$19; fix README editions table (shows patterns ✅ Lite) + "passwords"→singular + soften leak-sealing before public push. Captured in memory [[sesame-plugin-overnight]].
+- **Item 7 regression** — 61/61 behavioral assertions across 8 suites re-run against integrated HEAD (entry-epoch 14, throttle-svc 8, throttle-http 2, reveal 3, preview 4, item5 6, epoch 13, pro-epoch 11+1-harness-artifact). No regressions.
+- **Item 7 fresh security pass** — verifier (model fable): 250.3k tok, 38 tools, 1094s. Found 1 HIGH + 5 lower, all in-diff ones FIXED + verified:
+  | Fix | Commit | Verified |
+  |---|---|---|
+  | HIGH: preview bypass keyed on unbound nonce + any logged-in identity → gate on `$entry->canView($user)` | `59217f5` | admin bypass + anon gated (HTTP); negative by canView source (Solo 1-user cap blocks live non-viewer test) |
+  | MED: throttle sliding-window organic self-lockout → fixed window (window-numbered keys) + README disclosure | `e40e8fa` | 8/8 + 2/2 |
+  | LOW: retarget didn't bump epoch → bump on target change (both editions) | `3ba6114` | epoch 0→1 on retarget (Pro) |
+  | LOW: regenerateID depended on session already open → `$session->open()` first | `421081d` | epoch 13/13 |
+  | LOW: audit didn't record who → nullable `userId` col + write + CP "User" column | `c1db2e6` | reveal row userId=1 |
+  - **Accepted (no change):** migration/schemaVersion (unreleased baseline = Install.php).
+  - **Flagged OUTSIDE the diff for pre-launch (NOT fixed — pre-existing / need live CP test):** (1) PLAUSIBLE launch-blocker — per-entry password in Craft's PROVISIONAL-DRAFT autosave: password lands in a row keyed by the draft uid; applying the draft saves canonical with password===null → markProtectedWithoutSecret → protection on with empty secret, password silently lost (fail-closed). Needs one live CP test with the Protect field. (2) Multi-site translatable Protect field: last-propagated site's enabled=false tombstones the shared uid-keyed row → other sites fail OPEN. (3) DummyCache data cache makes the throttle a no-op.
+- Testbed reinstalled once (userId schema), reverted to lite, page-one rule clean; nothing on CAF.
+- **All P0 (items 1-7 code) COMPLETE.** Remaining = README editions/pitch COPY (Dan+Fable verdicts ready), README prose de-client, dangling design-doc comment refs (doc-intent call), the 3 pre-launch flags above, then P1 (scheduled lock/unlock → named codes → branding).
