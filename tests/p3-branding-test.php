@@ -5,13 +5,18 @@ $B = \iceboxind\sesame\services\Branding::class;
 $pass = 0; $fail = 0;
 $ck = function($n, $c) use (&$pass, &$fail) { if ($c) { $pass++; echo "  PASS  $n\n"; } else { $fail++; echo "  FAIL  $n\n"; } };
 
-// --- sanitizeAccent ---
-$ck('accent: hex kept', $B::sanitizeAccent('#2f6f7e') === '#2f6f7e');
-$ck('accent: short hex kept', $B::sanitizeAccent('#abc') === '#abc');
-$ck('accent: keyword kept', $B::sanitizeAccent('rebeccapurple') === 'rebeccapurple');
-$ck('accent: rgb() kept', $B::sanitizeAccent('rgb(10, 20, 30)') === 'rgb(10, 20, 30)');
+// --- sanitizeAccent (safe + legible: hex/rgb/hsl, contrast-gated, no bare words) ---
+$ck('accent: legible hex kept', $B::sanitizeAccent('#2f6f7e') === '#2f6f7e');
+$ck('accent: legible rgb() kept', $B::sanitizeAccent('rgb(47, 111, 126)') === 'rgb(47, 111, 126)');
+$ck('accent: legible hsl() kept', $B::sanitizeAccent('hsl(210, 50%, 40%)') === 'hsl(210, 50%, 40%)');
+$ck('accent: bare keyword rejected (unparseable colour)', $B::sanitizeAccent('rebeccapurple') === null);
+$ck('accent: white rejected (invisible on the light card)', $B::sanitizeAccent('#ffffff') === null);
+$ck('accent: black rejected (invisible on the dark card)', $B::sanitizeAccent('#000000') === null);
+$ck('accent: too-light hex rejected (low contrast)', $B::sanitizeAccent('#abc') === null);
 $ck('accent: CSS-injection rejected', $B::sanitizeAccent('red} body{display:none') === null);
 $ck('accent: markup rejected', $B::sanitizeAccent('</style><script>') === null);
+$ck('accent: over-length rejected', $B::sanitizeAccent('rgba(255.000, 255.000, 255.000, 0.5000)') === null);
+$ck('accent: array param => null (no TypeError)', $B::sanitizeAccent(['#fff']) === null);
 $ck('accent: blank => null', $B::sanitizeAccent('') === null);
 
 // --- fresh rule + code one ---
