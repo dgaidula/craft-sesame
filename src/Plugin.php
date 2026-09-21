@@ -310,6 +310,21 @@ class Plugin extends BasePlugin
                     return;
                 }
 
+                // Live Preview / a signed preview request made by a logged-in
+                // user bypasses the gate: an editor previewing their own
+                // (possibly unpublished) content is authenticated and explicit,
+                // so the password screen would only get in the way. The bypass
+                // is deliberately AND-ed with "not a guest": a Craft "Share"
+                // link is also a signed preview request but can be opened
+                // anonymously, and a shared preview of a protected page must
+                // still respect the password. A logged-in editor merely browsing
+                // the live front end (no preview token) is still gated — only the
+                // explicit preview flow is exempt.
+                $request = Craft::$app->getRequest();
+                if ($request->getIsPreview() && !Craft::$app->getUser()->getIsGuest()) {
+                    return;
+                }
+
                 // A protected URL must never be served from a static cache,
                 // whether the visitor is locked out or already unlocked (P0.1):
                 // a cached challenge ships a stale CSRF token, and a cached

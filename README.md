@@ -180,6 +180,14 @@ who requests a protected entry's normal front-end URL, without a valid
 session unlock, gets the password screen instead of the page — every time,
 with no template code required to make that true.
 
+**Previewing:** a **logged-in** editor using Live Preview or the entry's
+Preview button sees the real page, not the password screen — they're
+authenticated and explicitly previewing their own content. An **anonymous**
+visitor is always gated, *including* someone opening a Craft “Share” preview
+link: a shared preview of a protected page still requires the password. A
+logged-in editor simply browsing the live front end (no preview token) is
+gated too — only the explicit preview flow is exempt.
+
 It does **not** automatically gate:
 
 - **GraphQL** and the **Element API** — both query elements directly and
