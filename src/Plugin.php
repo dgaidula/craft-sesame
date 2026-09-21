@@ -200,11 +200,19 @@ class Plugin extends BasePlugin
                 $event->roots['sesame'] = __DIR__ . '/templates';
             }
         );
+        // Site (front-end) root is narrowed to just the gate templates. If the
+        // whole `templates/` dir were exposed here (as the CP root is), a
+        // front-end request to /sesame/rules or /sesame/log would resolve to
+        // those CP templates — untidy (they extend the CP layout and get no
+        // data) rather than a leak, but there is no reason to route them. The
+        // key stays `sesame/gate` so the challenge path (`sesame/gate/challenge`)
+        // and any per-rule template override still resolve, and a site's own
+        // `sesame/gate/challenge.twig` override still wins via its own root.
         Event::on(
             View::class,
             View::EVENT_REGISTER_SITE_TEMPLATE_ROOTS,
             static function (RegisterTemplateRootsEvent $event): void {
-                $event->roots['sesame'] = __DIR__ . '/templates';
+                $event->roots['sesame/gate'] = __DIR__ . '/templates/gate';
             }
         );
     }
