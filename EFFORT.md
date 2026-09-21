@@ -24,3 +24,16 @@ One row per work-pass. Agent metrics (duration/tokens/tool-calls) are EXACT from
 ## Estimation takeaways
 - A Lite/Pro Craft-5 plugin on an existing sibling skeleton, via orchestrated Sonnet builders + a fresh-context verifier, is ~4 builder passes + 1 verifier (~55 min agent wall-clock, ~1.1M agent tokens) plus orchestration/live-testing. The reusable base pays for itself from plugin #2.
 - Front-loading verified research made the builds near one-shot: no build stalled or needed a redo; the verifier found real but bounded issues (2 fail-opens, 1 open redirect), all fixed surgically.
+
+## Post-review hardening (2026-09-17, single orchestrator, Opus 4.8 [high])
+Working `docs/PRO-PRIORITIES.md` top-down. Each row a commit; testing moved to `craft5-plugin-testbed`.
+
+| Pass | Scope | Outcome |
+|---|---|---|
+| Item 0 | git-init both repos; vendor rename dgaidula→iceboxind (via rename-vendor.mjs) | done — commits 8f808d5, 94aa71e; renamed build 8/8 |
+| Item 1 (P0.1) | static-cache: no-cache headers + Blitz IS_CACHEABLE_REQUEST veto (guarded StaticCache) + purge backstop + README | done — commit f47e7ab; veto verified live, getMatchedElement works at init |
+| Bonus fix | encrypt-mode secrets base64-encoded (default mode couldn't persist — binary in utf8 col) | done — commit a4a1bf5; caught on the real testbed, missed by the overnight in-memory check |
+
+- **Key lesson:** an in-memory roundtrip is NOT a persistence test. The encrypt-mode bug (default password mode unsavable) only surfaced saving to a real Craft DB on the testbed. Live-test on the testbed from here.
+- **Rabbit-hole cost:** ~large chunk of time trying to make Blitz write cache files (never succeeded in any env); the veto DECISION was ultimately proven via a temp-file probe in the handler, not via observed caching. Should have reached for the direct probe sooner.
+- Remaining items 2-7 pending (schema/logic changes + bug sweep + Lite line). Context cleared before item 2.
