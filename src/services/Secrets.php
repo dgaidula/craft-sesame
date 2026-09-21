@@ -249,6 +249,16 @@ class Secrets extends Component
      */
     public function reconcileAppliedDraft(string $draftUid, string $canonicalUid): void
     {
+        // Creating an entry in the CP saves an unpublished draft, and Craft
+        // publishes it through applyDraft()'s else-branch, which saves the SAME
+        // element — so EVENT_AFTER_APPLY_DRAFT fires with the draft and canonical
+        // sharing one uid. There is nothing to move, and the clearForEntry() at
+        // the end would delete the entry's only secret, serving the page publicly
+        // while the field still reads "enabled". Bail out.
+        if ($draftUid === $canonicalUid) {
+            return;
+        }
+
         $draftRow = $this->getForEntry($draftUid);
         if ($draftRow === null) {
             return;
