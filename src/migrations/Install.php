@@ -47,7 +47,12 @@ class Install extends Migration
                 'epoch' => $this->integer()->notNull()->defaultValue(0),
                 // Pro columns — present in schema, Lite never reads/writes them.
                 'codesJson' => $this->text(),
-                'unlockUntil' => $this->dateTime(),
+                // Scheduled lock/unlock (P1.1): the rule protects only within the
+                // window [protectFrom, protectUntil). Either bound is nullable —
+                // null protectFrom = active from the start, null protectUntil =
+                // never expires, both null = always active. Stored UTC.
+                'protectFrom' => $this->dateTime(),
+                'protectUntil' => $this->dateTime(),
                 'rememberMe' => $this->boolean()->notNull()->defaultValue(false),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),

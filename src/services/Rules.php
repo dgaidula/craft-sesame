@@ -85,7 +85,8 @@ class Rules extends Component
             'message' => $rule->message,
             'templateOverride' => $rule->templateOverride,
             'codesJson' => $rule->codesJson,
-            'unlockUntil' => $rule->unlockUntil,
+            'protectFrom' => $rule->protectFrom,
+            'protectUntil' => $rule->protectUntil,
             'rememberMe' => (bool) $rule->rememberMe,
             'dateUpdated' => $now,
         ];
@@ -188,20 +189,51 @@ class Rules extends Component
             if (!$rule->enabled) {
                 continue;
             }
+            // Scheduled lock/unlock (P1.1): a rule outside its window doesn't
+            // protect right now — the page renders normally. Honored on every
+            // edition; authoring the schedule is Pro-gated.
+            if (!$rule->isScheduledActive()) {
+                continue;
+            }
 
-            $matched = match ($rule->matchType) {
-                'section' => ($section = $entry->getSection()) !== null && $section->handle === $rule->pattern,
-                'entryType' => $entry->getType()->handle === $rule->pattern,
-                'uri' => $this->matchesUri($rule->pattern, $uri) || $this->matchesUri($rule->pattern, $pathInfo),
-                default => false,
-            };
-
-            if ($matched) {
+            if ($this->ruleMatches($rule, $entry, $uri, $pathInfo)) {
                 return $rule->toScope();
             }
         }
 
         return null;
+    }
+
+    /**
+     * Whether ANY enabled rule matches the entry, IGNORING the schedule — the
+     * check the static-cache veto uses ({@see \iceboxind\sesame\services\StaticCache}).
+     * A page cached while it was public (outside its protect window) must never
+     * be served after the window locks it, so caching is refused for a URL a rule
+     * protects at ANY time, even when the gate is currently letting it through.
+     */
+    public function anyEnabledRuleMatches(Entry $entry): bool
+    {
+        $pathInfo = $this->currentPathInfo();
+        $uri = (string) ($entry->uri ?? '');
+
+        foreach ($this->all() as $rule) {
+            if ($rule->enabled && $this->ruleMatches($rule, $entry, $uri, $pathInfo)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** The pure match test for one rule against an entry — no enabled/schedule checks. */
+    private function ruleMatches(Rule $rule, Entry $entry, string $uri, string $pathInfo): bool
+    {
+        return match ($rule->matchType) {
+            'section' => ($section = $entry->getSection()) !== null && $section->handle === $rule->pattern,
+            'entryType' => $entry->getType()->handle === $rule->pattern,
+            'uri' => $this->matchesUri($rule->pattern, $uri) || $this->matchesUri($rule->pattern, $pathInfo),
+            default => false,
+        };
     }
 
     /**
@@ -276,7 +308,8 @@ class Rules extends Component
             'templateOverride' => $row['templateOverride'],
             'epoch' => (int) ($row['epoch'] ?? 0),
             'codesJson' => $row['codesJson'],
-            'unlockUntil' => $row['unlockUntil'],
+            'protectFrom' => $row['protectFrom'] ?? null,
+            'protectUntil' => $row['protectUntil'] ?? null,
             'rememberMe' => (bool) $row['rememberMe'],
         ]);
     }

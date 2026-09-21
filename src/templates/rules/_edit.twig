@@ -177,6 +177,33 @@
     {% if isPro %}
         <hr>
 
+        <div class="field">
+            <div class="heading">
+                <label>{{ 'Schedule'|t('sesame') }} <sup>PRO</sup></label>
+                <div class="instructions">
+                    <p>{{ 'Protect this rule’s pages only within a time window. Leave a field blank for “no bound”: set only Lock at to protect from that time on (e.g. an embargo that goes live later stays open until then); set only Unlock at to protect until then and open the page afterwards; set both for a fixed window. Leave both blank to protect always. Evaluated in the site’s server time.'|t('sesame') }}</p>
+                </div>
+            </div>
+        </div>
+
+        {{ forms.dateTimeField({
+            label: 'Lock at'|t('sesame'),
+            instructions: 'Start protecting at this time. Blank = protected from the start.'|t('sesame'),
+            id: 'protectFrom',
+            name: 'protectFrom',
+            value: protectFromDate,
+            errors: rule.getErrors('protectFrom'),
+        }) }}
+
+        {{ forms.dateTimeField({
+            label: 'Unlock at'|t('sesame'),
+            instructions: 'Stop protecting at this time — the page is public afterwards. Blank = never expires.'|t('sesame'),
+            id: 'protectUntil',
+            name: 'protectUntil',
+            value: protectUntilDate,
+            errors: rule.getErrors('protectUntil'),
+        }) }}
+
         {{ forms.lightswitchField({
             label: ('Remember me'|t('sesame') ~ ' <sup>PRO</sup>')|raw,
             instructions: 'Let a visitor check “Remember me” on the password screen so their unlock survives beyond the browser session, for Settings → General → Remember-me duration.'|t('sesame'),

@@ -58,11 +58,11 @@ the people who need to get in without a password.
 | Shareable magic links — email someone a link instead of a password | — | ✅ |
 | Access log — who unlocked what, and when, with retention | — | ✅ |
 | Remember me — unlocks that survive a browser restart, per rule | — | ✅ |
-| Scheduled lock and unlock, by date | — | roadmap |
+| Scheduled lock and unlock, by date — protect only within a time window | — | ✅ |
 | Multiple named codes per rule, each with a label, an expiry, and a revoke | — | roadmap |
 | Control-panel branding of the password screen | — | roadmap |
 
-The roadmap rows are the next three Pro features, in that order. A pattern
+The roadmap rows are the next two Pro features, in that order. A pattern
 rule created on Pro keeps protecting its pages if the site later moves to
 Lite; only creating one, or changing what it matches, needs Pro — its
 password, its on/off switch, and deleting it stay editable on Lite.
@@ -154,6 +154,16 @@ Pro adds the tools for running access, not just setting it.
   access now** bumps the epoch and invalidates it along with every other
   outstanding unlock for that rule; rotating the site’s `securityKey` remains
   the escape hatch that kills every signed Sesame token at once.
+- **Scheduled lock and unlock.** Give a rule a **Lock at** time, an **Unlock
+  at** time, or both, on its edit screen: it protects its pages only inside
+  that window. Set only *Unlock at* for an embargo (protected until launch,
+  public after); only *Lock at* to go dark on a date; both for a fixed run.
+  Times are evaluated in the site’s server timezone, and an unparseable one
+  fails closed (stays protected). The gate honours the schedule on both
+  editions — a schedule set on Pro keeps working after a downgrade — but only
+  Pro can create or change one. To keep a scheduled transition honest under a
+  full-page cache, Sesame never lets a scheduled URL be statically cached (a
+  page cached while public can’t linger past its lock time).
 
 ## Template usage / overriding the password screen
 

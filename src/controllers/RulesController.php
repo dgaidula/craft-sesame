@@ -3,6 +3,8 @@
 namespace iceboxind\sesame\controllers;
 
 use Craft;
+use craft\helpers\DateTimeHelper;
+use craft\helpers\Db;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
 use iceboxind\sesame\models\Rule;
@@ -78,6 +80,22 @@ class RulesController extends Controller
         // install can never end up with rememberMe=true on a saved rule
         // (the field is only rendered on the edit screen when isPro).
         $rule->rememberMe = Plugin::getInstance()->isPro() && (bool) $request->getBodyParam('rememberMe', false);
+
+        // PRO. Scheduled lock/unlock (P1.1). Authoring is Pro-gated: on Lite the
+        // fields aren't rendered and aren't read here, so $rule keeps whatever the
+        // stored row had — a grandfathered schedule survives a downgrade and is
+        // still enforced (Rules::match honors it on every edition), it just can't
+        // be changed. Stored as UTC; an empty/cleared value clears that bound.
+        if (Plugin::getInstance()->isPro()) {
+            $from = DateTimeHelper::toDateTime($request->getBodyParam('protectFrom'));
+            $until = DateTimeHelper::toDateTime($request->getBodyParam('protectUntil'));
+            $rule->protectFrom = $from ? Db::prepareDateForDb($from) : null;
+            $rule->protectUntil = $until ? Db::prepareDateForDb($until) : null;
+            if ($from && $until && $from >= $until) {
+                // An empty window would mean the rule never protects.
+                $rule->addError('protectUntil', Craft::t('sesame', 'The unlock time must be after the lock time.'));
+            }
+        }
 
         // A blank password on an EXISTING rule keeps the stored secret
         // unchanged — $rule was hydrated from the saved row above, so
@@ -278,6 +296,10 @@ class RulesController extends Controller
             // locks its target so a password rotation can't accidentally
             // re-author it (see the actionSave gate + _edit.twig).
             'ruleIsPattern' => $rule->matchType !== 'uri' || str_contains((string) $rule->pattern, '*'),
+            // Schedule bounds as DateTimes (system tz) for the dateTimeField
+            // widgets — stored as UTC strings.
+            'protectFromDate' => $rule->protectFrom ? DateTimeHelper::toDateTime($rule->protectFrom) : null,
+            'protectUntilDate' => $rule->protectUntil ? DateTimeHelper::toDateTime($rule->protectUntil) : null,
         ]);
     }
 }

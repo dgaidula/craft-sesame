@@ -39,23 +39,29 @@ class StaticCache extends Component
      * per-entry-field protection in one check); falls back to a URI-pattern
      * match when the element is not yet resolvable at this point in the
      * lifecycle.
+     *
+     * IGNORES the schedule (P1.1): this asks "could this URL ever be protected?",
+     * not "is it protected this second?". A page cached while it was public
+     * (before its lock time, or after its unlock time) must never be served once
+     * the window flips, and that flip won't purge an already-written cache entry —
+     * so a URL any enabled rule protects at ANY time is never cached. The gate
+     * itself still honors the schedule.
      */
     public function currentRequestIsProtected(): bool
     {
-        $gate = Plugin::getInstance()->gate;
+        $rules = Plugin::getInstance()->rules;
 
         try {
             $element = Craft::$app->getUrlManager()->getMatchedElement();
             if ($element instanceof Entry) {
-                return $gate->isProtected($element) !== null;
+                return Plugin::getInstance()->secrets->hasEntrySecret((string) $element->uid)
+                    || $rules->anyEnabledRuleMatches($element);
             }
         } catch (\Throwable) {
             // Element not resolvable this early — fall through to the URI check.
         }
 
-        return Plugin::getInstance()->rules->uriIsProtected(
-            Craft::$app->getRequest()->getPathInfo()
-        );
+        return $rules->uriIsProtected(Craft::$app->getRequest()->getPathInfo());
     }
 
     /**
