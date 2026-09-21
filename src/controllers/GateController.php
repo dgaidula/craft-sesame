@@ -18,8 +18,7 @@ use yii\web\Response;
  *    EVENT_SET_ROUTE handler, in place of the entry's normal template render.
  *  - actionUnlock: posted to from the challenge screen itself.
  *
- * CSRF stays ON (default) — this is a normal browser form POST, not an API
- * (PATTERNS.md §3).
+ * CSRF stays ON (default) — this is a normal browser form POST, not an API.
  */
 class GateController extends Controller
 {
@@ -189,7 +188,8 @@ class GateController extends Controller
         bool $cooldown = false,
     ): Response {
         // Best-effort front-end hygiene for a page that must exist behind a
-        // password — see PATTERNS.md §8 for what this does and doesn't cover.
+        // password (see the README's leak-caveats section for what this does
+        // and doesn't cover).
         Craft::$app->getResponse()->getHeaders()->set('X-Robots-Tag', 'none');
 
         // A per-rule template override is only validated as `string, max 255`

@@ -14,8 +14,7 @@ use yii\web\Cookie;
  * The gate: decides whether an entry is protected, whether the current
  * session has already unlocked it, and issues/validates the signed scope
  * token that ties a challenge-screen POST back to a specific rule or
- * per-entry secret without ever putting the secret itself on the wire
- * (PATTERNS.md §3).
+ * per-entry secret without ever putting the secret itself on the wire.
  */
 class Gate extends Component
 {
@@ -99,15 +98,16 @@ class Gate extends Component
 
     // --- PRO: remember-me cookie ---
     //
-    // Signed-cookie-with-exp (`hashData(json{k:scopeKey,exp})`), not an
+    // Signed-cookie-with-exp (`hashData(json{k:scopeKey,ep:epoch,exp})`), not an
     // opaque token mapped server-side — deliberately simpler: no extra table
     // to write, read, or garbage-collect for a feature that is already
-    // read-mostly. The tradeoff: it isn't individually revocable — the only
-    // way to invalidate every outstanding remember-me cookie at once is
-    // rotating the app security key (`securityKey` in general config), which
-    // also invalidates every other hashData()-signed token in the app
-    // (scope tokens, magic links). Acceptable here; called out so it's a
-    // deliberate choice, not an oversight (see SESAME-PRO-BRIEF.md §C).
+    // read-mostly. The tradeoff: it isn't INDIVIDUALLY revocable. But it carries
+    // the revocation epoch, so a password change or "Revoke all access" bumps the
+    // scope's epoch and invalidates every outstanding remember-me cookie for that
+    // scope at once (rotating the app `securityKey` remains the blunt instrument
+    // that also kills every other hashData()-signed token — scope tokens, magic
+    // links). Acceptable here; called out so it's a deliberate choice, not an
+    // oversight.
 
     private function setRememberCookie(Scope $scope, int $duration): void
     {

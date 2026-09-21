@@ -23,7 +23,7 @@ class Settings extends Model
     public string $pluginName = '';
 
     /**
-     * How passwords are stored (PATTERNS.md §4). false (default) =
+     * How passwords are stored. false (default) =
      * encrypt-at-rest — reversible, so an admin can reveal/re-share a shared
      * page password later; the right call for a shared, recall-needed
      * secret. true = bcrypt (write-only, no recall) for sites that want that
