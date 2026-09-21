@@ -1,12 +1,12 @@
 <?php
 
-namespace dgaidula\sesame\controllers;
+namespace iceboxind\sesame\controllers;
 
 use Craft;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
-use dgaidula\sesame\models\Rule;
-use dgaidula\sesame\Plugin;
+use iceboxind\sesame\models\Rule;
+use iceboxind\sesame\Plugin;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 

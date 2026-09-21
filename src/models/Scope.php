@@ -1,6 +1,6 @@
 <?php
 
-namespace dgaidula\sesame\models;
+namespace iceboxind\sesame\models;
 
 use craft\base\Model;
 
@@ -11,7 +11,7 @@ use craft\base\Model;
  * Never persisted and never round-tripped through the client: the challenge
  * form only ever sees a signed token that carries {@see self::$type} +
  * {@see self::$uid}; the secret is re-read from the DB on every request (see
- * {@see \dgaidula\sesame\services\Gate::scopeFromToken()}), so an edited
+ * {@see \iceboxind\sesame\services\Gate::scopeFromToken()}), so an edited
  * password or a disabled rule takes effect immediately.
  */
 class Scope extends Model
@@ -24,7 +24,7 @@ class Scope extends Model
 
     /**
      * Stable per-scope session/throttle key (`rule.<uid>` / `entry.<uid>`).
-     * Lazily computed and cached by {@see \dgaidula\sesame\services\Gate::scopeKey()}.
+     * Lazily computed and cached by {@see \iceboxind\sesame\services\Gate::scopeKey()}.
      */
     public ?string $scopeKey = null;
 

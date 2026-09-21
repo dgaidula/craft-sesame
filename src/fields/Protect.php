@@ -1,12 +1,12 @@
 <?php
 
-namespace dgaidula\sesame\fields;
+namespace iceboxind\sesame\fields;
 
 use Craft;
 use craft\base\ElementInterface;
 use craft\base\Field;
-use dgaidula\sesame\models\ProtectValue;
-use dgaidula\sesame\Plugin;
+use iceboxind\sesame\models\ProtectValue;
+use iceboxind\sesame\Plugin;
 
 /**
  * Per-entry password protection: a lightswitch "Protect this entry" + a
@@ -14,7 +14,7 @@ use dgaidula\sesame\Plugin;
  * column — only `{enabled: bool}` is serialized there (see
  * `serializeValue()`). The real secret lives in `{{%sesame_entry_secrets}}`,
  * keyed by the owning element's UID, encoded via
- * {@see \dgaidula\sesame\services\Secrets} exactly like a rule's secret.
+ * {@see \iceboxind\sesame\services\Secrets} exactly like a rule's secret.
  */
 class Protect extends Field
 {

@@ -1,6 +1,6 @@
 <?php
 
-namespace dgaidula\sesame\models;
+namespace iceboxind\sesame\models;
 
 use craft\base\Model;
 
@@ -9,7 +9,7 @@ use craft\base\Model;
  * `allowAdminChanges` is off; that's intentional, these are deploy-time
  * values). Editor-facing content (rules, per-entry secrets) lives in the
  * plugin's own DB tables instead — see
- * {@see \dgaidula\sesame\services\Rules} and {@see \dgaidula\sesame\services\Secrets}.
+ * {@see \iceboxind\sesame\services\Rules} and {@see \iceboxind\sesame\services\Secrets}.
  */
 class Settings extends Model
 {
@@ -39,10 +39,10 @@ class Settings extends Model
 
     // --- Pro (unused by Lite; kept here so Settings has a stable shape across editions) ---
 
-    /** PRO. Remember-me cookie lifetime, in seconds. 0 = off. Read by {@see \dgaidula\sesame\services\Gate::unlock()}. */
+    /** PRO. Remember-me cookie lifetime, in seconds. 0 = off. Read by {@see \iceboxind\sesame\services\Gate::unlock()}. */
     public int $rememberMeDuration = 0;
 
-    /** PRO. Access log retention, in days. 0 or less disables the purge (unbounded retention). Read by {@see \dgaidula\sesame\services\AccessLog::purgeExpired()}, which runs on `Gc::EVENT_RUN`. */
+    /** PRO. Access log retention, in days. 0 or less disables the purge (unbounded retention). Read by {@see \iceboxind\sesame\services\AccessLog::purgeExpired()}, which runs on `Gc::EVENT_RUN`. */
     public int $accessLogRetentionDays = 30;
 
     /** PRO. reCAPTCHA v3 secret — literal or `$ENV_VAR`. TODO Pro: not yet read anywhere — see the seam noted in `GateController::actionUnlock()`. */

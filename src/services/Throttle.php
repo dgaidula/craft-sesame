@@ -1,10 +1,10 @@
 <?php
 
-namespace dgaidula\sesame\services;
+namespace iceboxind\sesame\services;
 
 use Craft;
 use craft\base\Component;
-use dgaidula\sesame\Plugin;
+use iceboxind\sesame\Plugin;
 
 /**
  * Brute-force throttling for the unlock endpoint (PATTERNS.md §5 — Craft has

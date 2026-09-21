@@ -1,6 +1,6 @@
 <?php
 
-namespace dgaidula\sesame\services;
+namespace iceboxind\sesame\services;
 
 use Craft;
 use craft\base\Component;
@@ -8,15 +8,15 @@ use craft\db\Query;
 use craft\elements\Entry;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
-use dgaidula\sesame\migrations\Install;
-use dgaidula\sesame\models\Rule;
-use dgaidula\sesame\models\Scope;
+use iceboxind\sesame\migrations\Install;
+use iceboxind\sesame\models\Rule;
+use iceboxind\sesame\models\Scope;
 
 /**
  * Reads/writes {{%sesame_rules}} and matches the current entry against them.
  *
  * This is the content-layer, multi-row cousin of the single-row upsert
- * pattern ({@see \dgaidula\sesame\services\Secrets} for the entry-secrets
+ * pattern ({@see \iceboxind\sesame\services\Secrets} for the entry-secrets
  * table; Downtoll's FormConfig for the single-row shape) — editable on
  * production regardless of `allowAdminChanges`, entirely plugin-owned.
  */
@@ -121,7 +121,7 @@ class Rules extends Component
     /**
      * Evaluates enabled rules in sortOrder and returns the first match, or
      * null if nothing matches. Per-entry field overrides are Gate's concern,
-     * not this method's — see {@see \dgaidula\sesame\services\Gate::isProtected()}.
+     * not this method's — see {@see \iceboxind\sesame\services\Gate::isProtected()}.
      */
     public function match(Entry $entry): ?Scope
     {

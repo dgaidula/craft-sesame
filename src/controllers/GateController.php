@@ -1,19 +1,19 @@
 <?php
 
-namespace dgaidula\sesame\controllers;
+namespace iceboxind\sesame\controllers;
 
 use Craft;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
-use dgaidula\sesame\models\Scope;
-use dgaidula\sesame\Plugin;
+use iceboxind\sesame\models\Scope;
+use iceboxind\sesame\Plugin;
 use nystudio107\seomatic\Seomatic;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
 /**
  * Front-end gate. Reached two ways:
- *  - actionChallenge: routed to directly by {@see \dgaidula\sesame\Plugin::init()}'s
+ *  - actionChallenge: routed to directly by {@see \iceboxind\sesame\Plugin::init()}'s
  *    EVENT_SET_ROUTE handler, in place of the entry's normal template render.
  *  - actionUnlock: posted to from the challenge screen itself.
  *
@@ -48,7 +48,7 @@ class GateController extends Controller
 
     /**
      * PRO. Reached by clicking a magic link minted from the Rules edit
-     * screen ({@see \dgaidula\sesame\controllers\RulesController::actionMintLink()}).
+     * screen ({@see \iceboxind\sesame\controllers\RulesController::actionMintLink()}).
      * Validates the token itself (signature + expiry), then re-resolves the
      * scope LIVE from the current rule set — an edited password, a disabled
      * rule, or a deleted rule all take effect immediately, exactly like the

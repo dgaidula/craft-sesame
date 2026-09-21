@@ -12,7 +12,7 @@
  * project config entirely, or vary them by environment without touching
  * the CP.
  *
- * @see \dgaidula\sesame\models\Settings
+ * @see \iceboxind\sesame\models\Settings
  */
 
 return [

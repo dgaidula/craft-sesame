@@ -1,14 +1,14 @@
 <?php
 
-namespace dgaidula\sesame\services;
+namespace iceboxind\sesame\services;
 
 use Craft;
 use craft\base\Component;
 use craft\db\Query;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
-use dgaidula\sesame\migrations\Install;
-use dgaidula\sesame\Plugin;
+use iceboxind\sesame\migrations\Install;
+use iceboxind\sesame\Plugin;
 
 /**
  * Owns every secret Sesame stores: the generic encode/verify/reveal contract

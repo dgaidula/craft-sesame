@@ -1,6 +1,6 @@
 <?php
 
-namespace dgaidula\sesame\models;
+namespace iceboxind\sesame\models;
 
 use craft\base\Model;
 
@@ -10,7 +10,7 @@ use craft\base\Model;
  * matches with a single shared password.
  *
  * `secret`/`secretMode` hold the ALREADY-ENCODED value from
- * {@see \dgaidula\sesame\services\Secrets::store()} — this model never
+ * {@see \iceboxind\sesame\services\Secrets::store()} — this model never
  * carries a raw password; the CP save action (presentation layer) is
  * responsible for calling Secrets::store() on a posted password before
  * building/saving a Rule.
@@ -46,7 +46,7 @@ class Rule extends Model
     /** PRO. Scheduled lock/unlock. TODO Pro: not yet read anywhere. */
     public ?string $unlockUntil = null;
 
-    /** PRO. Remember-me opt-in per rule — read by {@see toScope()} and honored by {@see \dgaidula\sesame\services\Gate::unlock()} only when `Plugin::isPro()` and `Settings::$rememberMeDuration` > 0. */
+    /** PRO. Remember-me opt-in per rule — read by {@see toScope()} and honored by {@see \iceboxind\sesame\services\Gate::unlock()} only when `Plugin::isPro()` and `Settings::$rememberMeDuration` > 0. */
     public bool $rememberMe = false;
 
     public function rules(): array

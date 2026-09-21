@@ -1,6 +1,6 @@
 <?php
 
-namespace dgaidula\sesame\services;
+namespace iceboxind\sesame\services;
 
 use Craft;
 use craft\base\Component;
@@ -8,9 +8,9 @@ use craft\db\Query;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
 use craft\web\Request;
-use dgaidula\sesame\migrations\Install;
-use dgaidula\sesame\models\Scope;
-use dgaidula\sesame\Plugin;
+use iceboxind\sesame\migrations\Install;
+use iceboxind\sesame\models\Scope;
+use iceboxind\sesame\Plugin;
 
 /**
  * PRO. The unlock/fail/throttle audit trail — {{%sesame_access_log}}.

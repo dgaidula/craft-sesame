@@ -1,6 +1,6 @@
 <?php
 
-namespace dgaidula\sesame;
+namespace iceboxind\sesame;
 
 use Craft;
 use craft\base\Element;
@@ -18,14 +18,14 @@ use craft\services\UserPermissions;
 use craft\web\twig\variables\CraftVariable;
 use craft\web\UrlManager;
 use craft\web\View;
-use dgaidula\sesame\fields\Protect;
-use dgaidula\sesame\models\Settings;
-use dgaidula\sesame\services\AccessLog;
-use dgaidula\sesame\services\Gate;
-use dgaidula\sesame\services\Rules;
-use dgaidula\sesame\services\Secrets;
-use dgaidula\sesame\services\Throttle;
-use dgaidula\sesame\web\twig\PluginVariable;
+use iceboxind\sesame\fields\Protect;
+use iceboxind\sesame\models\Settings;
+use iceboxind\sesame\services\AccessLog;
+use iceboxind\sesame\services\Gate;
+use iceboxind\sesame\services\Rules;
+use iceboxind\sesame\services\Secrets;
+use iceboxind\sesame\services\Throttle;
+use iceboxind\sesame\web\twig\PluginVariable;
 use yii\base\Event;
 
 /**
@@ -50,10 +50,10 @@ class Plugin extends BasePlugin
     public bool $hasCpSettings = true;
     public bool $hasCpSection = true;
 
-    /** Required by every {@see \dgaidula\sesame\controllers\RulesController} action. */
+    /** Required by every {@see \iceboxind\sesame\controllers\RulesController} action. */
     public const PERMISSION_MANAGE_RULES = 'sesame:manageRules';
 
-    /** PRO. Required by {@see \dgaidula\sesame\controllers\LogController}. */
+    /** PRO. Required by {@see \iceboxind\sesame\controllers\LogController}. */
     public const PERMISSION_VIEW_LOG = 'sesame:viewLog';
 
     public const EDITION_LITE = 'lite';

@@ -242,7 +242,7 @@ edits are live immediately:
 Then, from the host site:
 
 ```bash
-composer require dgaidula/craft-sesame:@dev
+composer require iceboxind/craft-sesame:@dev
 php craft plugin/install sesame
 php craft up            # applies any pending plugin migrations
 ```
@@ -261,7 +261,7 @@ the migration idempotent.
 ## Coding standards and layout
 
 - **PHP** ≥ 8.2, **Craft** ^5.0 — the only runtime requirements.
-- **PSR-4** — everything under `src/` maps to the `dgaidula\sesame\`
+- **PSR-4** — everything under `src/` maps to the `iceboxind\sesame\`
   namespace.
 - **Code style** — `php-cs-fixer` (via the dev-only shim), configured in
   `.php-cs-fixer.dist.php`:

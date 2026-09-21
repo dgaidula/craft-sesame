@@ -1,6 +1,6 @@
 <?php
 
-namespace dgaidula\sesame\migrations;
+namespace iceboxind\sesame\migrations;
 
 use craft\db\Migration;
 

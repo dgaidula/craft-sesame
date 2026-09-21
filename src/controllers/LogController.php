@@ -1,10 +1,10 @@
 <?php
 
-namespace dgaidula\sesame\controllers;
+namespace iceboxind\sesame\controllers;
 
 use Craft;
 use craft\web\Controller;
-use dgaidula\sesame\Plugin;
+use iceboxind\sesame\Plugin;
 use yii\web\ForbiddenHttpException;
 use yii\web\Response;
 

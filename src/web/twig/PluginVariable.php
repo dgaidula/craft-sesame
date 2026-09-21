@@ -1,8 +1,8 @@
 <?php
 
-namespace dgaidula\sesame\web\twig;
+namespace iceboxind\sesame\web\twig;
 
-use dgaidula\sesame\Plugin;
+use iceboxind\sesame\Plugin;
 
 /**
  * Exposes `craft.sesame.*` to templates.

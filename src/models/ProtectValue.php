@@ -1,11 +1,11 @@
 <?php
 
-namespace dgaidula\sesame\models;
+namespace iceboxind\sesame\models;
 
 use craft\base\Model;
 
 /**
- * Normalized value of the Sesame Protection field ({@see \dgaidula\sesame\fields\Protect}).
+ * Normalized value of the Sesame Protection field ({@see \iceboxind\sesame\fields\Protect}).
  *
  * `password` is TRANSIENT — only populated right after a POST that included
  * a new password. It is never persisted in the content column (see

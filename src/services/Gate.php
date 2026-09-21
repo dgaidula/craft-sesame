@@ -1,13 +1,13 @@
 <?php
 
-namespace dgaidula\sesame\services;
+namespace iceboxind\sesame\services;
 
 use Craft;
 use craft\base\Component;
 use craft\elements\Entry;
 use craft\helpers\Json;
-use dgaidula\sesame\models\Scope;
-use dgaidula\sesame\Plugin;
+use iceboxind\sesame\models\Scope;
+use iceboxind\sesame\Plugin;
 use yii\web\Cookie;
 
 /**
