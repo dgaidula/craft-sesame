@@ -1,0 +1,12 @@
+$p = \iceboxind\sesame\Plugin::getInstance();
+$enc = $p->secrets->store('letmein');
+$rule = new \iceboxind\sesame\models\Rule();
+$rule->enabled = true;
+$rule->label = 'Testbed';
+$rule->matchType = 'uri';
+$rule->pattern = 'sesame-test/page-one';
+$rule->secret = $enc['secret'];
+$rule->secretMode = $enc['mode'];
+$rule->message = 'Protected. Enter the password.';
+$ok = $p->rules->save($rule);
+return json_encode(['saved' => $ok, 'mode' => $enc['mode'], 'uid' => $rule->uid, 'errors' => $rule->getErrors()]);
