@@ -23,61 +23,92 @@
         autofocus: true,
     }) }}
 
-    {{ forms.selectField({
-        label: 'Protects'|t('sesame'),
-        instructions: 'What this rule matches. A URI glob covers any page by path; Section/Entry type cover every entry of that kind, everywhere.'|t('sesame'),
-        id: 'matchType',
-        name: 'matchType',
-        options: [
-            { label: 'A URI (glob)'|t('sesame'), value: 'uri' },
-            { label: 'A section'|t('sesame'), value: 'section' },
-            { label: 'An entry type'|t('sesame'), value: 'entryType' },
-        ],
-        value: rule.matchType,
-        toggle: true,
-        targetPrefix: '#match-',
-    }) }}
+    {# Lite gates pattern rules (wildcards / whole section / whole entry type) to
+       Pro — see RulesController::actionSave(). `lockPattern` is an existing Pro-
+       style rule being edited on Lite (grandfathered, or after a downgrade): its
+       target is shown read-only and posted unchanged via hidden inputs, so a
+       password rotation or enable toggle here can't wipe or re-author it (which
+       the save gate would then reject). Everywhere else the normal editor shows,
+       trimmed to exact-URL only on Lite. #}
+    {% set lockPattern = not isPro and not isNew and ruleIsPattern %}
 
-    {# Only the pattern field matching the CURRENT matchType select value should
-       post as `pattern` — all three sit in the DOM at once (toggled by CSS via
-       the select's fieldtoggle behavior above), so a small script below keeps
-       exactly one of them named `pattern` as the select changes; none of them
-       carries that name by default. #}
-    <div id="match-uri"{% if rule.matchType != 'uri' %} class="hidden"{% endif %}>
-        {{ forms.textField({
-            label: 'URI pattern'|t('sesame'),
-            instructions: 'The entry’s URI, or a `*` glob. Examples: `district-resources` (exact), `district-resources/*` (that page and everything under it).'|t('sesame'),
-            id: 'pattern-uri',
-            class: 'sesame-pattern-input',
-            value: rule.matchType == 'uri' ? rule.pattern : '',
-            placeholder: 'district-resources/*',
-            errors: rule.matchType == 'uri' ? rule.getErrors('pattern') : [],
-        }) }}
-    </div>
-
-    <div id="match-section"{% if rule.matchType != 'section' %} class="hidden"{% endif %}>
+    {% if lockPattern %}
+        <input type="hidden" name="matchType" value="{{ rule.matchType }}">
+        <input type="hidden" name="pattern" value="{{ rule.pattern }}">
+        {% set protectsLabel = { uri: 'URL pattern'|t('sesame'), section: 'Section'|t('sesame'), entryType: 'Entry type'|t('sesame') }[rule.matchType] ?? rule.matchType %}
+        <div class="field">
+            <div class="heading"><label>{{ 'Protects'|t('sesame') }}</label></div>
+            <div class="input">
+                <p>{{ protectsLabel }}: <code>{{ rule.pattern }}</code></p>
+                <p class="light">{{ 'This is a pattern rule — a Sesame Pro feature. You can change its password, enable/disable it, or delete it here; editing what it protects requires Sesame Pro.'|t('sesame') }}</p>
+            </div>
+        </div>
+    {% else %}
         {{ forms.selectField({
-            label: 'Section'|t('sesame'),
-            instructions: 'Every entry in this section is protected, on every page it renders.'|t('sesame'),
-            id: 'pattern-section',
-            class: 'sesame-pattern-input',
-            options: [{ label: 'Select a section…'|t('sesame'), value: '' }]|merge(sectionOptions),
-            value: rule.matchType == 'section' ? rule.pattern : '',
-            errors: rule.matchType == 'section' ? rule.getErrors('pattern') : [],
+            label: 'Protects'|t('sesame'),
+            instructions: isPro
+                ? 'What this rule matches. A URI glob covers any page by path; Section/Entry type cover every entry of that kind, everywhere.'|t('sesame')
+                : 'What this rule matches. The free edition protects an exact URL; wildcards, whole sections, and whole entry types are a Sesame Pro feature.'|t('sesame'),
+            id: 'matchType',
+            name: 'matchType',
+            options: isPro ? [
+                { label: 'A URI (glob)'|t('sesame'), value: 'uri' },
+                { label: 'A section'|t('sesame'), value: 'section' },
+                { label: 'An entry type'|t('sesame'), value: 'entryType' },
+            ] : [
+                { label: 'A URL (exact)'|t('sesame'), value: 'uri' },
+            ],
+            value: rule.matchType,
+            toggle: true,
+            targetPrefix: '#match-',
         }) }}
-    </div>
 
-    <div id="match-entryType"{% if rule.matchType != 'entryType' %} class="hidden"{% endif %}>
-        {{ forms.selectField({
-            label: 'Entry type'|t('sesame'),
-            instructions: 'Every entry of this type is protected, regardless of which section it lives in.'|t('sesame'),
-            id: 'pattern-entryType',
-            class: 'sesame-pattern-input',
-            options: [{ label: 'Select an entry type…'|t('sesame'), value: '' }]|merge(entryTypeOptions),
-            value: rule.matchType == 'entryType' ? rule.pattern : '',
-            errors: rule.matchType == 'entryType' ? rule.getErrors('pattern') : [],
-        }) }}
-    </div>
+        {# Only the pattern field matching the CURRENT matchType select value should
+           post as `pattern` — the inputs that exist sit in the DOM at once (toggled
+           by CSS via the select's fieldtoggle behavior above), so a small script
+           below keeps exactly one of them named `pattern` as the select changes;
+           none of them carries that name by default. On Lite only the URL input is
+           rendered. #}
+        <div id="match-uri"{% if rule.matchType != 'uri' %} class="hidden"{% endif %}>
+            {{ forms.textField({
+                label: isPro ? 'URI pattern'|t('sesame') : 'URL'|t('sesame'),
+                instructions: isPro
+                    ? 'The entry’s URI, or a `*` glob. Examples: `district-resources` (exact), `district-resources/*` (that page and everything under it).'|t('sesame')
+                    : 'The entry’s exact URI, no leading slash — e.g. `district-resources`. Wildcards (`*`) are a Sesame Pro feature.'|t('sesame'),
+                id: 'pattern-uri',
+                class: 'sesame-pattern-input',
+                value: rule.matchType == 'uri' ? rule.pattern : '',
+                placeholder: isPro ? 'district-resources/*' : 'district-resources',
+                errors: rule.matchType == 'uri' ? rule.getErrors('pattern') : [],
+            }) }}
+        </div>
+
+        {% if isPro %}
+            <div id="match-section"{% if rule.matchType != 'section' %} class="hidden"{% endif %}>
+                {{ forms.selectField({
+                    label: 'Section'|t('sesame'),
+                    instructions: 'Every entry in this section is protected, on every page it renders.'|t('sesame'),
+                    id: 'pattern-section',
+                    class: 'sesame-pattern-input',
+                    options: [{ label: 'Select a section…'|t('sesame'), value: '' }]|merge(sectionOptions),
+                    value: rule.matchType == 'section' ? rule.pattern : '',
+                    errors: rule.matchType == 'section' ? rule.getErrors('pattern') : [],
+                }) }}
+            </div>
+
+            <div id="match-entryType"{% if rule.matchType != 'entryType' %} class="hidden"{% endif %}>
+                {{ forms.selectField({
+                    label: 'Entry type'|t('sesame'),
+                    instructions: 'Every entry of this type is protected, regardless of which section it lives in.'|t('sesame'),
+                    id: 'pattern-entryType',
+                    class: 'sesame-pattern-input',
+                    options: [{ label: 'Select an entry type…'|t('sesame'), value: '' }]|merge(entryTypeOptions),
+                    value: rule.matchType == 'entryType' ? rule.pattern : '',
+                    errors: rule.matchType == 'entryType' ? rule.getErrors('pattern') : [],
+                }) }}
+            </div>
+        {% endif %}
+    {% endif %}
 
     <hr>
 

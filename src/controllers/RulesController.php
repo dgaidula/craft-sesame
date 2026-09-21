@@ -61,6 +61,13 @@ class RulesController extends Controller
             throw new NotFoundHttpException(Craft::t('sesame', 'Rule not found.'));
         }
 
+        // Capture what the rule targeted BEFORE the posted values overwrite it,
+        // so the Lite authoring gate below can tell an unchanged existing
+        // pattern rule (password rotation is fine) from one being created or
+        // re-targeted (Pro only).
+        $storedMatchType = $rule->matchType;
+        $storedPattern = $rule->pattern;
+
         $rule->label = (string) $request->getBodyParam('label', $rule->label);
         $rule->matchType = (string) $request->getBodyParam('matchType', $rule->matchType);
         $rule->pattern = (string) $request->getBodyParam('pattern', $rule->pattern);
@@ -82,6 +89,24 @@ class RulesController extends Controller
             $rule->secretMode = $encoded['mode'];
         } elseif ($isNew) {
             $rule->addError('secret', Craft::t('sesame', 'A password is required.'));
+        }
+
+        // Lite AUTHORING gate (P0.5). Pattern rules — a `*` wildcard, a whole
+        // section, or a whole entry type — are a Pro feature; Lite keeps exact-URI
+        // rules and the per-entry Protect field. This gates AUTHORING only:
+        // Rules::match() has no edition check, so a pattern rule created while Pro
+        // keeps protecting after a downgrade, and Lite may still rotate its
+        // password / enable / disable / delete / reorder it. Only creating a
+        // pattern rule, or changing a rule's target into/within pattern territory,
+        // is blocked. Exact URI = matchType 'uri' with no '*'.
+        if (!Plugin::getInstance()->isPro()) {
+            $incomingIsPattern = $rule->matchType !== 'uri' || str_contains($rule->pattern, '*');
+            $targetChanged = $isNew
+                || $rule->matchType !== $storedMatchType
+                || $rule->pattern !== $storedPattern;
+            if ($incomingIsPattern && $targetChanged) {
+                $rule->addError('pattern', Craft::t('sesame', 'Wildcard, whole-section, and whole-entry-type rules are a Sesame Pro feature. On the free edition, protect an exact URL (no “*”), or use the per-entry “Sesame Protection” field.'));
+            }
         }
 
         // Changing an existing rule's password revokes every outstanding unlock
@@ -247,6 +272,10 @@ class RulesController extends Controller
             'sectionOptions' => $sectionOptions,
             'entryTypeOptions' => $entryTypeOptions,
             'isPro' => Plugin::getInstance()->isPro(),
+            // Whether the (stored) rule is a pattern rule — the Lite edit screen
+            // locks its target so a password rotation can't accidentally
+            // re-author it (see the actionSave gate + _edit.twig).
+            'ruleIsPattern' => $rule->matchType !== 'uri' || str_contains((string) $rule->pattern, '*'),
         ]);
     }
 }
