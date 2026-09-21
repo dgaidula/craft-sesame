@@ -238,8 +238,8 @@ class Rules extends Component
      * else matches literally.
      *
      * A trailing `/*` is special-cased to mean "this base path AND everything
-     * under it" — so `district-resources/*` matches the landing entry at URI
-     * `district-resources` as well as `district-resources/child`. Without this
+     * under it" — so `members/*` matches the landing entry at URI
+     * `members` as well as `members/staff`. Without this
      * the bare base (whose Craft URI has no trailing slash) would fall through
      * unprotected, which is exactly the page the admin most wants gated and is
      * what the edit-screen help text promises.

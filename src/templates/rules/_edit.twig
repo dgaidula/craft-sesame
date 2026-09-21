@@ -73,12 +73,12 @@
             {{ forms.textField({
                 label: isPro ? 'URI pattern'|t('sesame') : 'URL'|t('sesame'),
                 instructions: isPro
-                    ? 'The entry’s URI, or a `*` glob. Examples: `district-resources` (exact), `district-resources/*` (that page and everything under it).'|t('sesame')
-                    : 'The entry’s exact URI, no leading slash — e.g. `district-resources`. Wildcards (`*`) are a Sesame Pro feature.'|t('sesame'),
+                    ? 'The entry’s URI, or a `*` glob. Examples: `members` (exact), `members/*` (that page and everything under it).'|t('sesame')
+                    : 'The entry’s exact URI, no leading slash — e.g. `members`. Wildcards (`*`) are a Sesame Pro feature.'|t('sesame'),
                 id: 'pattern-uri',
                 class: 'sesame-pattern-input',
                 value: rule.matchType == 'uri' ? rule.pattern : '',
-                placeholder: isPro ? 'district-resources/*' : 'district-resources',
+                placeholder: isPro ? 'members/*' : 'members',
                 errors: rule.matchType == 'uri' ? rule.getErrors('pattern') : [],
             }) }}
         </div>
@@ -160,7 +160,7 @@
 
     {{ forms.textField({
         label: 'Template override'|t('sesame'),
-        instructions: 'Advanced. A site template path to render instead of the default password screen for this rule, e.g. `sesame/gate/challenge-district`.'|t('sesame'),
+        instructions: 'Advanced. A site template path to render instead of the default password screen for this rule, e.g. `sesame/gate/challenge-members`.'|t('sesame'),
         id: 'templateOverride',
         name: 'templateOverride',
         value: rule.templateOverride,
@@ -190,7 +190,7 @@
                 <div class="heading">
                     <label>{{ 'Shareable link'|t('sesame') }} <sup>PRO</sup></label>
                     <div class="instructions">
-                        <p>{{ 'Mints a one-click link that unlocks this rule for whoever opens it — no password needed. Good for emailing a district a single link.'|t('sesame') }}</p>
+                        <p>{{ 'Mints a one-click link that unlocks this rule for whoever opens it — no password needed. Good for emailing someone a single link instead of a shared password.'|t('sesame') }}</p>
                     </div>
                 </div>
                 <button type="button" class="btn" id="sesame-link-btn" data-uid="{{ rule.uid }}">{{ 'Copy shareable link'|t('sesame') }}</button>

@@ -117,10 +117,11 @@ class GateController extends Controller
         }
 
         // TODO Pro: reCAPTCHA v3 verification goes here (settings.recaptchaSecret
-        // / recaptchaSiteKey, an obfuscated field name per guardrail 7 in the
-        // consuming site's CLAUDE.md / PATTERNS.md §9), before the password
-        // compare — so a scored-bad submission never even reaches Secrets::verify.
-        // Not built; Lite/Pro both skip straight to the throttle+password checks.
+        // / recaptchaSiteKey), before the password compare — so a scored-bad
+        // submission never even reaches Secrets::verify. Feed the token through a
+        // renamed field, not Google's default `g-recaptcha-response`, so a naive
+        // bot that autofills the standard field fails verification. Not built;
+        // Lite/Pro both skip straight to the throttle + password checks.
 
         if (!Plugin::getInstance()->secrets->verify($password, $scope->secret, $scope->secretMode)) {
             $throttle->record($ip, $scopeKey);

@@ -26,7 +26,7 @@ class Rule extends Model
     /** @var 'uri'|'section'|'entryType' */
     public string $matchType = 'uri';
 
-    /** A URI glob (`district-resources`, `district-resources/*`), or a section/entry-type handle. */
+    /** A URI glob (`members`, `members/*`), or a section/entry-type handle. */
     public string $pattern = '';
 
     /** The stored (encrypted or bcrypt-hashed) secret — never plaintext. */
