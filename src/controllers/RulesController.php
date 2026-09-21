@@ -174,8 +174,9 @@ class RulesController extends Controller
             throw new NotFoundHttpException(Craft::t('sesame', 'Rule not found.'));
         }
 
-        // Default 7 days, editor-adjustable per mint via `ttlDays`.
-        $ttlDays = max(1, (int) Craft::$app->getRequest()->getBodyParam('ttlDays', 7));
+        // Default 7 days, editor-adjustable per mint via `ttlDays`, capped at a
+        // year so a fat-fingered value can't mint an effectively-permanent link.
+        $ttlDays = max(1, min(365, (int) Craft::$app->getRequest()->getBodyParam('ttlDays', 7)));
         $ttl = $ttlDays * 86400;
 
         // A URI rule with no glob has one unambiguous target page — link
@@ -183,7 +184,13 @@ class RulesController extends Controller
         // protects many pages at once with no single "the" page, so the
         // link just lands on the unlock and sends the visitor to the site
         // root; they're unlocked for everything the rule covers either way.
-        $target = ($rule->matchType === 'uri' && !str_contains($rule->pattern, '*')) ? $rule->pattern : '';
+        // The target must be site-relative with a leading slash: a Craft entry
+        // URI is stored WITHOUT one ('members/handbook'), and GateController's
+        // open-redirect guard (safeReturn) rejects a bare relative path, which
+        // is why an exact-URI link used to dump the visitor on the home page.
+        $target = ($rule->matchType === 'uri' && !str_contains($rule->pattern, '*'))
+            ? '/' . ltrim($rule->pattern, '/')
+            : '';
 
         $token = Plugin::getInstance()->gate->signMagicLink($rule->toScope(), $ttl, $target);
 
