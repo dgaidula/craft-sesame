@@ -7,11 +7,13 @@ use craft\base\Element;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\elements\Entry;
+use craft\events\DraftEvent;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterTemplateRootsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
 use craft\events\SetElementRouteEvent;
+use craft\services\Drafts;
 use craft\services\Fields;
 use craft\services\Gc;
 use craft\services\UserPermissions;
@@ -108,6 +110,8 @@ class Plugin extends BasePlugin
         $this->registerRequestGate();
         $this->registerBlitzIntegration();
         $this->registerGarbageCollection();
+        $this->registerDraftReconciliation();
+        $this->warnIfCacheIsDummy();
     }
 
     public function getCpNavItem(): ?array
@@ -151,6 +155,7 @@ class Plugin extends BasePlugin
             'plugin' => $this,
             'settings' => $this->getSettings(),
             'isPro' => $this->isPro(),
+            'cacheIsDummy' => $this->cacheIsDummy(),
         ]);
     }
 
@@ -260,10 +265,10 @@ class Plugin extends BasePlugin
     // TODO Pro: GraphQL-aware gating + query-filter helpers. Natural seam is
     // a `Gql::EVENT_REGISTER_GQL_TYPES` / resolver hook here (mirroring
     // registerFieldType()'s EVENT_REGISTER_* pattern) plus a
-    // `craft.sesame.unprotected(query)` Twig helper on PluginVariable — see
-    // PATTERNS.md §8, "GraphQL... exposed per schema/section scope,
-    // URI-independent". Not built; GraphQL queries bypass Sesame entirely on
-    // both editions today (documented in README's leak-caveats section).
+    // `craft.sesame.unprotected(query)` Twig helper on PluginVariable, so a
+    // protected entry can be excluded from a GraphQL/section scope regardless of
+    // URI. Not built; GraphQL queries bypass Sesame entirely on both editions
+    // today (documented in README's leak-caveats section).
 
     // TODO Pro: bulk "protect selected" element index action. Natural seam
     // is `Entry::EVENT_REGISTER_ACTIONS`, gated behind `isPro()`, adding a
@@ -288,12 +293,61 @@ class Plugin extends BasePlugin
             Gc::EVENT_RUN,
             function (): void {
                 $this->accessLog->purgeExpired();
+                // Sweep per-entry secret rows orphaned by a discarded draft that
+                // staged a password (both editions).
+                $this->secrets->purgeOrphans();
             }
         );
     }
 
     /**
-     * Gates front-end entry requests (PATTERNS.md §2). A protected, not-yet-
+     * Moves a draft's staged per-entry password onto its canonical entry when the
+     * draft is applied (P0-flag #1). Craft's edit screen autosaves to a provisional
+     * draft with its own uid, so the typed password is stored under the draft's uid
+     * and the canonical save can't see it — without this the applied page would lock
+     * with an empty secret. The event fires AFTER the canonical save inside
+     * applyDraft(), so this reconciliation is the final word. See
+     * {@see \iceboxind\sesame\services\Secrets::reconcileAppliedDraft()}.
+     */
+    private function registerDraftReconciliation(): void
+    {
+        Event::on(
+            Drafts::class,
+            Drafts::EVENT_AFTER_APPLY_DRAFT,
+            function (DraftEvent $event): void {
+                $draft = $event->draft;
+                $canonical = $event->canonical;
+                if ($draft?->uid && $canonical?->uid) {
+                    $this->secrets->reconcileAppliedDraft($draft->uid, $canonical->uid);
+                }
+            }
+        );
+    }
+
+    /**
+     * The brute-force throttle counts in Craft's data cache, so it is a silent
+     * no-op when that component is `DummyCache` (a legitimate config). Warn in the
+     * log at boot; the settings screen shows a persistent notice
+     * ({@see settingsHtml()} / {@see cacheIsDummy()}), and the README says the same.
+     */
+    private function warnIfCacheIsDummy(): void
+    {
+        if ($this->cacheIsDummy()) {
+            Craft::warning(
+                'Sesame brute-force throttling is disabled: the site’s cache component is DummyCache.',
+                __METHOD__
+            );
+        }
+    }
+
+    /** True when Craft's data cache is a no-op DummyCache (the throttle can't count). */
+    public function cacheIsDummy(): bool
+    {
+        return Craft::$app->getCache() instanceof \yii\caching\DummyCache;
+    }
+
+    /**
+     * Gates front-end entry requests. A protected, not-yet-
      * unlocked entry gets routed to the challenge screen in place of its
      * normal template render; everything else is untouched.
      */

@@ -32,7 +32,10 @@ on Craft 4.
    can’t buy unlimited tries). The per-page ceiling is shared, so a determined
    attacker can push a single page into a short cooldown for everyone — the
    deliberate trade for closing the rotation bypass; the real fix for a proxy
-   that hides client IPs is your site’s `trustedHosts` config.
+   that hides client IPs is your site’s `trustedHosts` config. The counter
+   lives in Craft’s data cache, so if that component is `DummyCache` the
+   throttle can’t count and is disabled — Sesame warns in the log and on its
+   settings screen when it detects this.
 6. **Ships a real password screen** — a small, deliberate design, themeable
    light/dark, fully overridable per site or per rule.
 

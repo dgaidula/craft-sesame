@@ -5,6 +5,7 @@ namespace iceboxind\sesame\fields;
 use Craft;
 use craft\base\ElementInterface;
 use craft\base\Field;
+use craft\helpers\ElementHelper;
 use iceboxind\sesame\models\ProtectValue;
 use iceboxind\sesame\Plugin;
 
@@ -26,6 +27,20 @@ class Protect extends Field
     public static function icon(): string
     {
         return 'lock';
+    }
+
+    /**
+     * Protection is a property of the ENTRY, not of one of its translations, and
+     * the secret table is keyed by a single element UID shared across every site.
+     * Declaring the field untranslatable keeps the `enabled` flag propagating
+     * identically to all sites, so one site's save can never tombstone the shared
+     * secret row while another site still expects it — closing the multi-site
+     * fail-open a translatable value would open. Per-site passwords, if ever
+     * wanted, would key the table by (elementUid, siteId) instead.
+     */
+    public static function supportedTranslationMethods(): array
+    {
+        return [self::TRANSLATION_METHOD_NONE];
     }
 
     public function normalizeValue(mixed $value, ?ElementInterface $element = null): ProtectValue
@@ -70,16 +85,42 @@ class Protect extends Field
      * protection was switched off) into {{%sesame_entry_secrets}}, keyed by
      * the element's UID. Runs after the element itself is saved, so the UID
      * is guaranteed to exist.
+     *
+     * Draft/revision handling (the provisional-draft flow the CP edit screen
+     * uses for every entry):
+     *  - **Revision** — an immutable snapshot; never read, write, or tombstone a
+     *    secret from one.
+     *  - **Draft** — a staging copy with its OWN uid that must not change the
+     *    live page before publish. Remember only a freshly TYPED password, keyed
+     *    by the draft's uid; defer the enabled/disabled decision to the canonical
+     *    save on apply. We deliberately skip disableForEntry() and
+     *    markProtectedWithoutSecret() here: keying an empty placeholder by the
+     *    draft uid would, on apply, wipe the canonical's real secret when the
+     *    editor merely opened the entry without touching the password. The
+     *    typed password is moved onto the canonical by
+     *    {@see \iceboxind\sesame\services\Secrets::reconcileAppliedDraft()},
+     *    fired from Drafts::EVENT_AFTER_APPLY_DRAFT.
+     *  - **Canonical** — the real save: full store/clear/fail-closed logic.
      */
     public function afterElementSave(ElementInterface $element, bool $isNew): void
     {
+        if (ElementHelper::isRevision($element)) {
+            parent::afterElementSave($element, $isNew);
+            return;
+        }
+
         $uid = $element->uid ?? null;
         if ($uid) {
             /** @var ProtectValue $value */
             $value = $element->getFieldValue($this->handle);
             $secrets = Plugin::getInstance()->secrets;
 
-            if (!$value->enabled) {
+            if (ElementHelper::isDraft($element)) {
+                // Staging: only remember a freshly typed password (see docblock).
+                if ($value->password !== null) {
+                    $secrets->storeForEntry($uid, $value->password);
+                }
+            } elseif (!$value->enabled) {
                 // Keep the epoch alive across a later re-enable — see
                 // Secrets::disableForEntry(). NOT a hard delete (that happens
                 // only when the entry itself is deleted, below).
@@ -102,15 +143,22 @@ class Protect extends Field
     }
 
     /**
-     * When a protected entry is deleted, remove its stored secret so the
-     * encrypted password doesn't linger in {{%sesame_entry_secrets}} forever
-     * (the table has no cascade FK, since it is keyed by element UID rather
-     * than id). Hard-delete only; a soft-deleted entry that is restored keeps
-     * its protection.
+     * When a protected CANONICAL entry is hard-deleted, remove its stored secret
+     * so the encrypted password doesn't linger in {{%sesame_entry_secrets}}
+     * forever (the table has no cascade FK — it's keyed by element UID, not id).
+     * Soft-deleted entries keep their protection (they can be restored).
+     *
+     * A DRAFT/revision is deliberately skipped: `Drafts::applyDraft()` hard-deletes
+     * the provisional draft BEFORE it fires EVENT_AFTER_APPLY_DRAFT (Craft
+     * 5.10.11, Drafts.php:340 then :361), so clearing here would wipe the staged
+     * password out from under the reconcile step that is supposed to move it onto
+     * the canonical. A draft that is discarded instead of applied leaves its row
+     * orphaned, and {@see \iceboxind\sesame\services\Secrets::purgeOrphans()}
+     * sweeps it in GC.
      */
     public function afterElementDelete(ElementInterface $element): void
     {
-        if ($element->uid && $element->hardDelete) {
+        if ($element->uid && $element->hardDelete && !ElementHelper::isDraftOrRevision($element)) {
             Plugin::getInstance()->secrets->clearForEntry($element->uid);
         }
 

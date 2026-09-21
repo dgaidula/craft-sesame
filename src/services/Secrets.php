@@ -17,7 +17,7 @@ use yii\db\Expression;
  * {{%sesame_entry_secrets}} — the per-entry (Protect field) password table,
  * keyed by the owning element's UID.
  *
- * Encoding (see PATTERNS.md §4): encrypt-at-rest by default via
+ * Encoding: encrypt-at-rest by default via
  * `Security::encryptByKey()`/`decryptByKey()` + `hash_equals()` — reversible,
  * so an admin can reveal/re-share a shared page password later. bcrypt
  * (`hashPassword()`/`validatePassword()`, write-only) when
@@ -229,5 +229,83 @@ class Secrets extends Component
                 'uid' => StringHelper::UUID(),
             ])->execute();
         }
+    }
+
+    /**
+     * Applies a just-published draft's staged password to its canonical entry.
+     * Called from Drafts::EVENT_AFTER_APPLY_DRAFT (fired AFTER the canonical save
+     * inside applyDraft), so it runs last and its result is the end state.
+     *
+     * The draft's afterElementSave stored only a freshly TYPED password, keyed by
+     * the draft's uid (see {@see \iceboxind\sesame\fields\Protect::afterElementSave()}).
+     * The canonical save that just ran couldn't see it — the password is transient
+     * and never in the content column — so, with the field's enabled flag but no
+     * password, it fell through to markProtectedWithoutSecret() and locked the page
+     * with an empty secret. Here we move the draft's real secret onto the canonical
+     * (replacing that placeholder) and bump the canonical's epoch if the secret
+     * actually changed. When the editor DIDN'T type a password on the draft there is
+     * no draft row, and the canonical save's own result (kept password / disabled /
+     * fail-closed) already stands — so this is a no-op.
+     */
+    public function reconcileAppliedDraft(string $draftUid, string $canonicalUid): void
+    {
+        $draftRow = $this->getForEntry($draftUid);
+        if ($draftRow === null) {
+            return;
+        }
+
+        $canonicalRow = $this->getForEntry($canonicalUid);
+        $changed = $canonicalRow === null
+            || $canonicalRow['secret'] !== $draftRow['secret']
+            || $canonicalRow['mode'] !== $draftRow['mode'];
+
+        $db = Craft::$app->getDb();
+        $now = Db::prepareDateForDb(new \DateTime());
+        $existingId = (new Query())
+            ->select(['id'])
+            ->from(Install::ENTRY_SECRETS_TABLE)
+            ->where(['elementUid' => $canonicalUid])
+            ->scalar();
+
+        if ($existingId) {
+            $data = [
+                'secret' => $draftRow['secret'],
+                'secretMode' => $draftRow['mode'],
+                'dateUpdated' => $now,
+            ];
+            if ($changed) {
+                $data['epoch'] = new Expression('[[epoch]] + 1');
+            }
+            $db->createCommand()->update(Install::ENTRY_SECRETS_TABLE, $data, ['id' => $existingId])->execute();
+        } else {
+            $db->createCommand()->insert(Install::ENTRY_SECRETS_TABLE, [
+                'elementUid' => $canonicalUid,
+                'secret' => $draftRow['secret'],
+                'secretMode' => $draftRow['mode'],
+                'dateCreated' => $now,
+                'dateUpdated' => $now,
+                'uid' => StringHelper::UUID(),
+            ])->execute();
+        }
+
+        // The staged draft row has been applied; drop it.
+        $this->clearForEntry($draftUid);
+    }
+
+    /**
+     * Deletes per-entry secret rows whose element UID no longer matches any
+     * element — orphans left by a draft that staged a password and was then
+     * discarded (or any element removed without the field's delete hook firing).
+     * Runs in GC on every edition. A draft/revision that still exists keeps its
+     * uid in {{%elements}}, so a live staging row is never purged.
+     */
+    public function purgeOrphans(): int
+    {
+        return (int) Craft::$app->getDb()->createCommand()
+            ->delete(Install::ENTRY_SECRETS_TABLE, [
+                'not in', 'elementUid',
+                (new Query())->select(['uid'])->from('{{%elements}}'),
+            ])
+            ->execute();
     }
 }

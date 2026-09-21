@@ -11,6 +11,13 @@
 } %}
 
 {% block content %}
+{% if cacheIsDummy %}
+    <div class="readable" style="margin-bottom:16px;">
+        <blockquote class="note warning">
+            {{ 'Brute-force throttling is disabled because this site’s cache component is DummyCache. Sesame counts failed unlock attempts in Craft’s data cache; with a no-op cache, attempts are never counted and the unlock endpoint isn’t rate-limited. Configure a real cache (file, Redis, Memcached, …) to enable throttling.'|t('sesame') }}
+        </blockquote>
+    </div>
+{% endif %}
 <div id="pb-general">
     {{ forms.autosuggestField({
         label: 'Plugin name'|t('sesame'),
