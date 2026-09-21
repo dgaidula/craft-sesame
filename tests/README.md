@@ -66,6 +66,26 @@ REPL-flush gap, not FPM caching.
 
 ## Running
 
+**Everything, one command** (from anywhere with Node + the testbed up):
+
+```sh
+node ~/sw/github-public/craft-sesame/tests/run-all.mjs
+```
+
+`run-all.mjs` orchestrates the whole harness — it reseeds a clean baseline
+between suites (they are not isolated: several mutate the password, epoch,
+edition, or rule set), sets the edition each suite needs, seeds the rule/code
+uids the code and schedule drivers take as arguments, runs every suite, and
+prints a per-suite ✓/✗ and a grand total. Last green run: **171 passed, 0
+failed across 17 suites**. It exits non-zero on any failure. `reseed.php` is the
+baseline it (and you) can apply by hand between individual runs.
+
+`preview-test.mjs` is the one suite `run-all` skips — it needs a validly-signed
+`x-craft-preview` token, which can't be minted over raw HTTP; run it from a
+browser CP preview if you need it.
+
+To run a single suite instead:
+
 Logic suites (from the testbed directory):
 
 ```sh
@@ -97,7 +117,7 @@ you change behaviour.
 | `testbed-gate-test.mjs` | HTTP | core gate spine: challenge → unlock → session persistence | — |
 | `entry-epoch-test.php` | logic | per-entry Protect field: store/verify + revocation epoch, disable/re-enable tombstone | 14 |
 | `epoch-test.mjs` | HTTP | rule revocation epoch: password change and revoke-all cut off a live session | 13 |
-| `pro-epoch-test.mjs` | HTTP | Pro carriers (magic links, remember-me) carry the epoch and revoke with it | 11 |
+| `pro-epoch-test.mjs` | HTTP | Pro carriers (magic links, remember-me) carry the epoch and revoke with it | 12 |
 | `throttle-svc-test.php` | logic | per-IP + per-scope fixed-window buckets; rotating-IP defense; exact counts | 8 |
 | `throttle-http-test.mjs` | HTTP | end-to-end cooldown after `attemptLimit` wrong passwords (before bcrypt) | 2 |
 | `login-reveal-test.mjs` | HTTP | reveal-password needs an elevated session; writes a `reveal` audit row | 3 |
