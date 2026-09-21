@@ -216,14 +216,26 @@ class RulesController extends Controller
         return $this->asJson(['ok' => true]);
     }
 
-    // --- PRO: named-code management (the code-list UI on the rule edit screen) ---
+    // --- Named-code management (the code-list UI on the rule edit screen) ---
     // Thin wrappers over the Codes service; all POST + JSON, permission-gated by
-    // beforeAction() and Pro-gated here.
+    // beforeAction(). Edition gate per the decided line: only ADDING a second
+    // code is Pro — changing (relabel/expiry) is Pro too, but REVOKING and
+    // DELETING an existing code are allowed on every edition, so a site that
+    // drops to Lite can still cut off access.
 
-    /** PRO. Adds a named code (label + password + optional expiry) to a rule. */
+    /**
+     * Adds a named code (label + password + optional expiry) to a rule. Adding a
+     * SECOND code (when the rule already has one) is a Pro feature; code one
+     * itself is created with the rule.
+     */
     public function actionAddCode(): Response
     {
-        [$request, $ruleUid] = $this->requireCodeManagement();
+        [$request, $ruleUid] = $this->requireCodeManagement(true, false);
+
+        $codes = Plugin::getInstance()->codes;
+        if (!Plugin::getInstance()->isPro() && $codes->count($ruleUid) >= 1) {
+            return $this->asJson(['error' => Craft::t('sesame', 'Multiple codes per rule are a Sesame Pro feature.')]);
+        }
 
         $password = (string) $request->getBodyParam('password', '');
         if ($password === '') {
@@ -231,8 +243,7 @@ class RulesController extends Controller
         }
         $label = trim((string) $request->getBodyParam('label', '')) ?: null;
 
-        $code = Plugin::getInstance()->codes->add($ruleUid, $password, $label, $this->postedExpiry());
-        if ($code === null) {
+        if ($codes->add($ruleUid, $password, $label, $this->postedExpiry()) === null) {
             return $this->asJson(['error' => Craft::t('sesame', 'Couldn’t add the code — a rule can have at most {n} codes.', ['n' => \iceboxind\sesame\services\Codes::MAX_CODES])]);
         }
 
@@ -242,7 +253,7 @@ class RulesController extends Controller
     /** PRO. Relabels a code and/or changes its expiry. */
     public function actionUpdateCode(): Response
     {
-        [$request] = $this->requireCodeManagement(false);
+        [$request] = $this->requireCodeManagement(false, true);
 
         $codeId = (string) $request->getRequiredBodyParam('codeId');
         $codes = Plugin::getInstance()->codes;
@@ -252,33 +263,33 @@ class RulesController extends Controller
         return $this->asJson(['ok' => true]);
     }
 
-    /** PRO. Revokes a code (cuts off its holders; the code stays listed as revoked). */
+    /** Revokes a code (cuts off its holders; the code stays listed as revoked). Every edition. */
     public function actionRevokeCode(): Response
     {
-        [$request] = $this->requireCodeManagement(false);
+        [$request] = $this->requireCodeManagement(false, false);
         Plugin::getInstance()->codes->revoke((string) $request->getRequiredBodyParam('codeId'));
         return $this->asJson(['ok' => true]);
     }
 
-    /** PRO. Deletes a code outright (refused for a rule's last/only code). */
+    /** Deletes a code outright (refused for a rule's last/only code). Every edition. */
     public function actionDeleteCode(): Response
     {
-        [$request] = $this->requireCodeManagement(false);
+        [$request] = $this->requireCodeManagement(false, false);
         $ok = Plugin::getInstance()->codes->delete((string) $request->getRequiredBodyParam('codeId'));
         return $this->asJson($ok ? ['ok' => true] : ['error' => Craft::t('sesame', 'A rule must keep at least one code.')]);
     }
 
     /**
-     * Shared preamble for the code-management actions: POST + JSON + Pro gate.
-     * When $needRule is true, also requires and validates the `uid` rule param.
+     * Shared preamble for the code-management actions: POST + JSON, an optional
+     * Pro gate ($requirePro), and — when $needRule — the `uid` rule param.
      *
      * @return array{0:\craft\web\Request,1:string}
      */
-    private function requireCodeManagement(bool $needRule = true): array
+    private function requireCodeManagement(bool $needRule = true, bool $requirePro = true): array
     {
         $this->requirePostRequest();
         $this->requireAcceptsJson();
-        if (!Plugin::getInstance()->isPro()) {
+        if ($requirePro && !Plugin::getInstance()->isPro()) {
             throw new NotFoundHttpException(Craft::t('sesame', 'Named codes are a Sesame Pro feature.'));
         }
 
@@ -410,8 +421,11 @@ class RulesController extends Controller
         // Additional codes (2..N) for the Pro code-management list — code one is
         // managed by the top Password field, so it's dropped here. Prepared for
         // the template: expiry as a system-tz DateTime, and a status label.
+        // Listed on EVERY edition (Fix 2): a site that dropped to Lite must be
+        // able to see and revoke/delete codes it made while on Pro. Adding and
+        // relabelling are still Pro-gated (in the actions + the template).
         $additionalCodes = [];
-        if (Plugin::getInstance()->isPro() && $rule->uid) {
+        if ($rule->uid) {
             $all = $codes->forRule((string) $rule->uid);
             array_shift($all); // drop code one
             foreach ($all as $c) {

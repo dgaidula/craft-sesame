@@ -262,17 +262,19 @@
                 <button type="button" class="btn" id="sesame-link-btn" data-uid="{{ rule.uid }}">{{ 'Copy shareable link'|t('sesame') }}</button>
                 <p id="sesame-link-result" class="light" style="margin-top:6px;"></p>
             </div>
+        {% endif %}
+    {% endif %}
 
-            {# Named codes (codes 2..N). The primary code is the Password field
-               above; these are extra credentials, each with its own label,
-               expiry, revoke, and link — "send District A its own code". All
-               actions call the Codes service via the code-* endpoints and reload
-               on change. #}
-            <div class="field" id="sesame-codes" data-uid="{{ rule.uid }}">
+    {# Named codes — codes 2..N (the primary code is the Password field above).
+       Listed on EVERY edition (Fix 2) so a site that dropped from Pro to Lite can
+       still see and revoke/delete codes it made on Pro; ADDING a code and
+       relabel/expiry stay Pro (gated below and in the controller). #}
+    {% if not isNew %}
+        <div class="field" id="sesame-codes" data-uid="{{ rule.uid }}">
                 <div class="heading">
-                    <label>{{ 'Named codes'|t('sesame') }} <sup>PRO</sup></label>
+                    <label>{{ 'Named codes'|t('sesame') }}{% if isPro %} <sup>PRO</sup>{% endif %}</label>
                     <div class="instructions">
-                        <p>{{ 'Hand out separate codes — each with its own label, optional expiry, individual revoke, and its own shareable link. Revoking or expiring one cuts off just its holders. Up to 25 codes per rule.'|t('sesame') }}</p>
+                        <p>{{ 'Extra credentials beyond the primary password — each with its own label, optional expiry, individual revoke, and shareable link. Revoking or expiring one cuts off just its holders; the primary password still works. Up to 25 codes per rule.'|t('sesame') }}</p>
                     </div>
                 </div>
 
@@ -289,16 +291,16 @@
                         <tbody>
                             {% for c in additionalCodes %}
                                 <tr data-code="{{ c.uid }}">
-                                    <td><input type="text" class="text sesame-code-label" value="{{ c.label }}" placeholder="{{ 'Label'|t('sesame') }}"></td>
-                                    <td><input type="date" class="text sesame-code-exp" value="{{ c.expiresAt ? c.expiresAt|date('Y-m-d') : '' }}"></td>
+                                    <td><input type="text" class="text sesame-code-label" value="{{ c.label }}" placeholder="{{ 'Label'|t('sesame') }}"{% if not isPro %} readonly{% endif %}></td>
+                                    <td><input type="date" class="text sesame-code-exp" value="{{ c.expiresAt ? c.expiresAt|date('Y-m-d') : '' }}"{% if not isPro %} disabled{% endif %}></td>
                                     <td>
                                         {% set statusClass = { active: 'enabled', revoked: 'off', expired: 'pending' }[c.status] ?? '' %}
                                         <span class="status {{ statusClass }}"></span>{{ c.status|t('sesame') }}
                                     </td>
                                     <td>
-                                        <button type="button" class="btn small sesame-code-save">{{ 'Save'|t('sesame') }}</button>
+                                        {% if isPro %}<button type="button" class="btn small sesame-code-save">{{ 'Save'|t('sesame') }}</button>{% endif %}
                                         {% if c.canReveal %}<button type="button" class="btn small sesame-code-reveal">{{ 'Reveal'|t('sesame') }}</button>{% endif %}
-                                        <button type="button" class="btn small sesame-code-link">{{ 'Copy link'|t('sesame') }}</button>
+                                        {% if isPro %}<button type="button" class="btn small sesame-code-link">{{ 'Copy link'|t('sesame') }}</button>{% endif %}
                                         {% if c.status == 'active' %}<button type="button" class="btn small sesame-code-revoke">{{ 'Revoke'|t('sesame') }}</button>{% endif %}
                                         <button type="button" class="btn small sesame-code-delete">{{ 'Delete'|t('sesame') }}</button>
                                         <span class="sesame-code-result light" style="margin-left:6px;"></span>
@@ -309,15 +311,18 @@
                     </table>
                 {% endif %}
 
-                <div class="sesame-addcode">
-                    <input type="text" id="sesame-newcode-label" class="text" placeholder="{{ 'Label (e.g. District A)'|t('sesame') }}" style="max-width:180px;">
-                    <input type="password" id="sesame-newcode-pw" class="text" placeholder="{{ 'Password'|t('sesame') }}" autocomplete="new-password" style="max-width:160px;">
-                    <input type="date" id="sesame-newcode-exp" class="text" title="{{ 'Optional expiry'|t('sesame') }}">
-                    <button type="button" class="btn" id="sesame-addcode-btn">{{ 'Add code'|t('sesame') }}</button>
-                    <span id="sesame-addcode-result" class="light" style="margin-left:6px;"></span>
-                </div>
-            </div>
-        {% endif %}
+                {% if isPro %}
+                    <div class="sesame-addcode">
+                        <input type="text" id="sesame-newcode-label" class="text" placeholder="{{ 'Label (e.g. District A)'|t('sesame') }}" style="max-width:180px;">
+                        <input type="password" id="sesame-newcode-pw" class="text" placeholder="{{ 'Password'|t('sesame') }}" autocomplete="new-password" style="max-width:160px;">
+                        <input type="date" id="sesame-newcode-exp" class="text" title="{{ 'Optional expiry'|t('sesame') }}">
+                        <button type="button" class="btn" id="sesame-addcode-btn">{{ 'Add code'|t('sesame') }}</button>
+                        <span id="sesame-addcode-result" class="light" style="margin-left:6px;"></span>
+                    </div>
+                {% elseif not additionalCodes|length %}
+                    <p class="light">{{ 'Multiple codes per rule are a Sesame Pro feature.'|t('sesame') }}</p>
+                {% endif %}
+        </div>
     {% endif %}
 {% endblock %}
 
@@ -482,8 +487,9 @@ document.addEventListener('click', function (e) {
     function rowOf(el) { return el.closest('tr[data-code]'); }
     function resultEl(row) { return row.querySelector('.sesame-code-result'); }
 
-    // Add a code
-    document.getElementById('sesame-addcode-btn').addEventListener('click', function () {
+    // Add a code (the button is Pro-only, so it may be absent on Lite)
+    var addBtn = document.getElementById('sesame-addcode-btn');
+    if (addBtn) addBtn.addEventListener('click', function () {
         var out = document.getElementById('sesame-addcode-result');
         var pw = document.getElementById('sesame-newcode-pw').value;
         if (!pw) { out.textContent = {{ 'Enter a password for the new code.'|t('sesame')|json_encode|raw }}; return; }
