@@ -41,6 +41,8 @@ class AccessLog extends Component
         Craft::$app->getDb()->createCommand()->insert(Install::ACCESS_LOG_TABLE, [
             'ruleId' => $ruleId,
             'elementId' => $elementId,
+            // The acting user, if any (null for an anonymous front-end visitor).
+            'userId' => Craft::$app->getUser()->getId(),
             'scopeKey' => Plugin::getInstance()->gate->scopeKey($scope),
             'event' => $event,
             'ip' => $request->getUserIP() ?: '0.0.0.0',

@@ -11,6 +11,7 @@
                         <th scope="col">{{ 'When'|t('sesame') }}</th>
                         <th scope="col">{{ 'Event'|t('sesame') }}</th>
                         <th scope="col">{{ 'Target'|t('sesame') }}</th>
+                        <th scope="col">{{ 'User'|t('sesame') }}</th>
                         <th scope="col">{{ 'IP'|t('sesame') }}</th>
                         <th scope="col">{{ 'User agent'|t('sesame') }}</th>
                     </tr>
@@ -24,6 +25,7 @@
                                 <span class="status {{ statusClass }}"></span>{{ event.event|t('sesame') }}
                             </td>
                             <td>{{ event.target }}</td>
+                            <td>{{ event.user ?: '—' }}</td>
                             <td><code>{{ event.ip }}</code></td>
                             <td class="light">{{ event.userAgent|slice(0, 80) }}</td>
                         </tr>

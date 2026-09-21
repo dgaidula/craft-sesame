@@ -42,7 +42,8 @@ class LogController extends Controller
         }
 
         $elements = Craft::$app->getElements();
-        $events = array_map(function (array $row) use ($rulesById, $elements): array {
+        $users = Craft::$app->getUsers();
+        $events = array_map(function (array $row) use ($rulesById, $elements, $users): array {
             if (!empty($row['ruleId']) && isset($rulesById[(int) $row['ruleId']])) {
                 $row['target'] = $rulesById[(int) $row['ruleId']];
             } elseif (!empty($row['elementId'])) {
@@ -51,6 +52,12 @@ class LogController extends Controller
             } else {
                 $row['target'] = $row['scopeKey'];
             }
+
+            // Resolve the acting user (if any) to a display name; anonymous
+            // front-end events have no userId.
+            $row['user'] = !empty($row['userId'])
+                ? ($users->getUserById((int) $row['userId'])?->username ?? Craft::t('sesame', 'User #{id}', ['id' => $row['userId']]))
+                : '';
 
             return $row;
         }, Plugin::getInstance()->accessLog->recent(100));

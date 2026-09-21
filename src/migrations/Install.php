@@ -61,6 +61,10 @@ class Install extends Migration
                 'id' => $this->primaryKey(),
                 'ruleId' => $this->integer(),
                 'elementId' => $this->integer(),
+                // The acting CP / logged-in user, when there is one — null for an
+                // anonymous front-end unlock/fail/throttle, set for a reveal (and
+                // any unlock by a logged-in user). "Who" is the key audit field.
+                'userId' => $this->integer(),
                 'scopeKey' => $this->string()->notNull(),
                 'event' => $this->string(20)->notNull(), // unlock | link | fail | throttle | reveal
                 'ip' => $this->string(45)->notNull(), // long enough for IPv6
@@ -71,6 +75,7 @@ class Install extends Migration
             $this->createIndex(null, self::ACCESS_LOG_TABLE, ['scopeKey']);
             $this->addForeignKey(null, self::ACCESS_LOG_TABLE, ['ruleId'], self::RULES_TABLE, ['id'], 'SET NULL', null);
             $this->addForeignKey(null, self::ACCESS_LOG_TABLE, ['elementId'], '{{%elements}}', ['id'], 'CASCADE', null);
+            $this->addForeignKey(null, self::ACCESS_LOG_TABLE, ['userId'], '{{%users}}', ['id'], 'SET NULL', null);
         }
 
         if (!$this->db->tableExists(self::ENTRY_SECRETS_TABLE)) {
