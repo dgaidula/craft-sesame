@@ -41,6 +41,9 @@ class Throttle extends Component
      */
     private const SCOPE_LIMIT_MULTIPLIER = 5;
 
+    /** Rate-limits the cache-write warning to once per request (see bump()). */
+    private static bool $cacheWriteWarned = false;
+
     public function tooMany(string $ip, string $scopeKey): bool
     {
         $cache = Craft::$app->getCache();
@@ -90,7 +93,17 @@ class Throttle extends Component
 
         try {
             $count = (int) $cache->get($key);
-            $cache->set($key, $count + 1, $ttl);
+            // A false return means the write didn't land — e.g. Redis/Memcached
+            // is unreachable — so the count never rises and brute-force limiting
+            // is silently OFF. Warn (once per request, so a flood can't spam the
+            // log) rather than fail open in silence.
+            if ($cache->set($key, $count + 1, $ttl) === false && !self::$cacheWriteWarned) {
+                self::$cacheWriteWarned = true;
+                Craft::warning(
+                    'Sesame could not write a throttle counter to the cache — brute-force limiting is degraded (is the cache backend reachable?).',
+                    __METHOD__
+                );
+            }
         } finally {
             if ($locked) {
                 try {
