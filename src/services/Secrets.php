@@ -265,6 +265,16 @@ class Secrets extends Component
         }
 
         $canonicalRow = $this->getForEntry($canonicalUid);
+
+        // The editor staged a password on the draft but ALSO turned protection
+        // off: the canonical save wrote a 'disabled' tombstone. Respect the
+        // disable — don't resurrect the page by moving the staged secret over it.
+        // Just drop the orphaned draft row.
+        if ($canonicalRow !== null && $canonicalRow['mode'] === 'disabled') {
+            $this->clearForEntry($draftUid);
+            return;
+        }
+
         $changed = $canonicalRow === null
             || $canonicalRow['secret'] !== $draftRow['secret']
             || $canonicalRow['mode'] !== $draftRow['mode'];

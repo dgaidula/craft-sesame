@@ -116,8 +116,11 @@ class Protect extends Field
             $secrets = Plugin::getInstance()->secrets;
 
             if (ElementHelper::isDraft($element)) {
-                // Staging: only remember a freshly typed password (see docblock).
-                if ($value->password !== null) {
+                // Staging: remember a freshly typed password ONLY while protection
+                // is on. If the editor typed a password but also switched the
+                // field off, stage nothing — otherwise reconcile would resurrect
+                // the page on publish against the editor's intent.
+                if ($value->enabled && $value->password !== null) {
                     $secrets->storeForEntry($uid, $value->password);
                 }
             } elseif (!$value->enabled) {
