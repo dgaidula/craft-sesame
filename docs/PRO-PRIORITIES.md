@@ -260,3 +260,96 @@ behind the three ordered Pro features, and prose punctuation is typographic (cod
 blocks untouched — verified). Please re-read the “Revocation” and “only creating or
 changing one needs Pro” claims against the code you shipped for P0.2 and P0.5; the wording
 follows the spec, not a fresh read of the diff.
+
+## Fresh-session brief — release prep (written 2026-09-20)
+
+For a session opened **in this repo** (`~/sw/github-public/craft-sesame`), not in a
+client site. Previous sessions ran from a client project’s directory; their memory lives
+in that project’s store and is not needed — this file and `EFFORT.md` are the state.
+
+### 0. Audit before trusting anything
+
+Read `EFFORT.md` and this file, then check them against `git log` and the tree. The
+notes have been wrong before (09-19: “nothing required” while a HIGH was open). Confirm:
+the five fix commits `04ffca1 73faed7 b36aaeb b235d27 8f79ffc` are on `main`; the tree
+is clean; there is **no** `tests/` directory in the repo (the “61/61 assertions across
+8 suites” the earlier session ran live outside it — find that harness in
+`~/sw/github-private/craft5-plugin-testbed` or wherever it was left, and bring it into
+the repo under `tests/` or record exactly how to run it; a plugin about to be sold
+cannot have its only tests in a scratch directory).
+
+### 1. Findings from the 2026-09-20 fresh-context review of `e583fd1..HEAD` (UI, branding, five fixes)
+
+All five fixes **SHIP** as built. Branding **SHIPS** (Twig autoescape on, sanitizer held
+against 18 breakout probes, logo resolved through an asset id). The UI pass is **FIX
+FIRST** for the first item. One commit each:
+
+- **MEDIUM — expiry drift.** The code-management list posts a bare `YYYY-MM-DD` from an `<input type=date>`; `postedExpiry()` (`RulesController.php:311`) parses it with `toDateTime($v)` — `assumeSystemTimeZone=false`, so 00:00 **UTC** — and the list displays it in the site timezone. West of UTC “expires Oct 1” shows as Sep 30, and every Save re-posts the displayed date, so the expiry walks back a day per save. Fix: `DateTimeHelper::toDateTime($v, true)->setTime(23, 59, 59)` (end of the chosen day, site tz), or switch the input to `forms.dateField` (posts `{date, timezone}`). Then the live test in §3.
+
+- **LOW — accent has no contrast check and no fallback** (`services/Branding.php:34–48`, `templates/gate/challenge.twig:49–52`). `white`, `transparent`, `inherit`, and any bare word pass; an invalid value makes the button invisible. Drop the bare-keyword branch (or whitelist CSS named colours), check WCAG contrast against both card backgrounds, fall back to the built-in accent.
+
+- **LOW — lengths unbounded vs. columns.** `rgba(255.000, 255.000, 255.000, 0.5000)` is 39 chars against `string(32)`; heading > 255 → DB exception on strict MySQL/Postgres. `mb_strlen` caps in `sanitizeAccent` (≤ 32) and on heading (≤ 255); wire `errors: rule.getErrors('brandAccent')` in `_edit.twig:238–245`.
+
+- **LOW — TypeError on array-shaped params** (`BrandingController.php:59`, `RulesController.php:104`): `accent[]=x` → 500. `is_string($v) ? $v : null` before `sanitizeAccent()`.
+
+- **LOW — logo id unvalidated** (`BrandingController.php:53–54`, `RulesController.php:105–106`): a non-element id violates the FK → 500; a PDF renders a broken `<img>`. Resolve with `getAssetById()` and require `kind === 'image'`.
+
+- **LOW — revoke reports success unconditionally** (`RulesController.php:270–271`). Return `Codes::revoke()`’s bool.
+
+- **INFO — update/revoke/delete take a bare `codeId` with no rule binding** (`RulesController.php:256–280`). Not an escalation (`sesame:manageRules` is global; reveal and mint do bind), but a crafted request can revoke code one — the “Password” field — which the UI never lists, so the primary silently stops working. Bind `uid` and refuse code one on these three actions, or show code one’s status.
+
+- **INFO.** `actionLink` (`GateController.php:85–88`) checks `isActive` but not `code->ruleUid === scope->uid` — defense in depth. `Throttle::tooMany()` (`:54–58`) still fails open silently if a degraded cache returns null from `get()` (a throwing driver fails closed via 500 — fine). `challenge.twig:8` cites “the plugin’s own tests” that do not exist in the repo.
+
+Confirmed by the review, no action: every code action is POST + JSON + `sesame:manageRules`; reveal keeps the elevated session and audits `userId` + `codeId`; the Lite gate is authoring-only (add gated on `!isPro && count ≥ 1`, revoke/delete/reveal ungated, codes 2..N listed on every edition); no `isPro()` anywhere in `Rules`, `Secrets`, `Codes`, `Branding`, `StaticCache`, or the SET_ROUTE gate; no-cache on both SET_ROUTE outcomes and on the direct action URLs; Blitz veto intact; throttle before verify; session id regenerated on unlock; `safeReturn` on every redirect; site template root still `gate/` only; PSR-4 `iceboxind\sesame` on all 21 declarations; 29 files lint clean under PHP 8.
+
+### 2. Baseline — no migration
+
+Nothing predates `sesame_rule_codes` or any other table: the only hosts were a client
+DDEV (uninstalled, verified clean 09-17) and the testbed. **`Install.php` at release is
+the 1.0.0 baseline.** Set `Plugin::$schemaVersion = '1.0.0'`, and start migrations
+from the first post-release schema change. Do not build the “move a rule’s password
+into code one” migration — there is no site for it to run on.
+
+### 3. Live test matrix on `craft5-plugin-testbed` (your own; never a client site)
+
+- Fresh install on Lite, then flip to Pro (`ddev craft project-config/set plugins.sesame.edition pro`, then `ddev restart` — FPM workers cache the edition).
+
+- **CP create → set a per-entry password → publish → open as a visitor → the typed password unlocks.** Then edit the published entry, change the password in a draft, apply, and confirm the old password no longer works. Then discard a draft and confirm no orphan row.
+
+- **Expiry round trip** with `timezone: America/New_York` in general config: set an expiry of tomorrow, reload, confirm the list shows tomorrow, Save without changes, confirm it still shows tomorrow.
+
+- **Blitz**: install Blitz, cache-everything patterns, PHP delivery *and* rewrite delivery: unlocked page never cached; challenge never cached; a page cached before protection stops being served once a rule covering it is saved. This was the “done means” of P0.1 — check `EFFORT.md` for whether it was ever run live; if not, it has not been done.
+
+- Downgrade check: on Pro create a pattern rule with three codes and a schedule; flip to Lite; the rule still enforces, all three codes still work, revoke and delete still work, add is refused.
+
+- Re-run whatever harness §0 recovered; all green.
+
+### 4. Repo hygiene before the first push
+
+- **Git identity, before a remote exists.** Every commit so far except `600873c` carries `dgaidula@frankandvictor.com`, which GitHub links to no account. Rewrite once, with the tree clean:
+
+  ```
+  git -c user.name="Dan Gaidula" -c user.email="dan@gaidula.com" \
+    rebase --root --exec 'git commit --amend --no-edit --reset-author'
+  git log --format='%ae' | sort | uniq -c      # expect dan@gaidula.com only
+  ```
+
+- `CHANGELOG.md`: the single `1.0.0` entry with a real date heading `## 1.0.0 - YYYY-MM-DD` (the Store parses this form), summarizing the shipped feature set — not the build history.
+
+- `composer.json`: keywords beyond the generic three (`password`, `protect`, `gate`, `private`, `members`, `access`); `changelogUrl` pointing at the raw `CHANGELOG.md` on GitHub; `documentationUrl` stays on the README until `iceboxind.com/sesame` exists.
+
+- README: one last read against the code you ship (the editions table and the throttle bullet are the two places that drifted before).
+
+### 5. Publish
+
+1. `gh repo create dgaidula/craft-sesame --public --source=. --remote=origin --push` — source-available under the Craft License, so public is correct, and the repo lives under the personal account on purpose.
+2. Tag `1.0.0` **after** §3 is green; push tags.
+3. Packagist: submit `https://github.com/dgaidula/craft-sesame` — the package is `iceboxind/craft-sesame`; enable the GitHub hook.
+4. Craft Console (Icebox Industries org): connect the repo. Editions: Lite free, Pro **$49 + $19/yr**. Screenshots: the Rules list, a rule edit screen with named codes, the challenge screen light and dark, the branding settings, the access log. Listing copy comes from the README’s first section and editions table.
+5. Submit for review. The edition pre-approval email is optional; the review is the pre-approval. Downtoll is the family’s dry run and goes first if it has not gone yet; otherwise submit.
+
+### 6. Afterwards — demand-gated only
+
+reCAPTCHA v3 · automatic leak-sealing helper · access-log IP anonymization · bulk
+“protect selected” · a DB-backed throttle counter (removes the cache dependency; see the
+09-19 verdicts). None before there is a signal.
