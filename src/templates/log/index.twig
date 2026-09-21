@@ -1,0 +1,39 @@
+{% extends '_layouts/cp' %}
+
+{% set title = 'Access Log'|t('sesame') %}
+
+{% block content %}
+    {% if events|length %}
+        <div class="tablepane">
+            <table class="data fullwidth">
+                <thead>
+                    <tr>
+                        <th scope="col">{{ 'When'|t('sesame') }}</th>
+                        <th scope="col">{{ 'Event'|t('sesame') }}</th>
+                        <th scope="col">{{ 'Target'|t('sesame') }}</th>
+                        <th scope="col">{{ 'IP'|t('sesame') }}</th>
+                        <th scope="col">{{ 'User agent'|t('sesame') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                        <tr>
+                            <td>{{ event.dateCreated|datetime('short') }}</td>
+                            <td>
+                                {% set statusClass = { unlock: 'enabled', fail: 'off', throttle: 'pending' }[event.event] ?? '' %}
+                                <span class="status {{ statusClass }}"></span>{{ event.event|t('sesame') }}
+                            </td>
+                            <td>{{ event.target }}</td>
+                            <td><code>{{ event.ip }}</code></td>
+                            <td class="light">{{ event.userAgent|slice(0, 80) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="zilch">
+            <p>{{ 'No access log events yet. Unlock, failed-password, and throttle events on protected pages will show up here.'|t('sesame') }}</p>
+        </div>
+    {% endif %}
+{% endblock %}

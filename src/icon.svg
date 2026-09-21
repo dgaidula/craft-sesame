@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Sesame">
+  <circle cx="256" cy="256" r="256" fill="#5E6AD2"/>
+  <g fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M176 96h114l78 78v242a16 16 0 0 1-16 16H176a16 16 0 0 1-16-16V112a16 16 0 0 1 16-16z"/>
+    <path d="M290 96v78h78"/>
+    <path d="M192 260h128"/>
+    <path d="M192 324h128"/>
+    <path d="M192 388h80"/>
+  </g>
+</svg>

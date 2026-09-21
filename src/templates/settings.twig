@@ -1,0 +1,81 @@
+{% import '_includes/forms' as forms %}
+
+{# Tabbed settings. NOTE: all of this is project config — read-only on prod
+   when allowAdminChanges is off (by design; dev-owned). Rules + per-entry
+   passwords are editor-facing content and live in the plugin's own CP
+   section instead (presentation layer). #}
+
+{% set tabs = {
+    general:  { label: 'General'|t('sesame'),  url: '#pb-general' },
+    advanced: { label: 'Advanced'|t('sesame'), url: '#pb-advanced' },
+} %}
+
+{% block content %}
+<div id="pb-general">
+    {{ forms.autosuggestField({
+        label: 'Plugin name'|t('sesame'),
+        instructions: 'What this plugin is called in the control panel (sidebar, Plugins screen, settings). Leave blank for “Sesame”. Best set in config/sesame.php so it holds with admin changes off.'|t('sesame'),
+        id: 'pluginName',
+        name: 'pluginName',
+        suggestEnvVars: true,
+        placeholder: 'Sesame',
+        value: settings.pluginName,
+    }) }}
+
+    {{ forms.lightswitchField({
+        label: 'Hash passwords (bcrypt)'|t('sesame'),
+        instructions: 'Off (default) stores passwords encrypted-at-rest, so an admin can reveal/re-share a code later — the right call for a shared page password. On stores them bcrypt-hashed instead (write-only, no recall).'|t('sesame'),
+        id: 'hashPasswords',
+        name: 'hashPasswords',
+        on: settings.hashPasswords,
+    }) }}
+
+    {% if isPro %}
+        <hr>
+
+        <h2>{{ 'Remember-me'|t('sesame') }} <sup>PRO</sup></h2>
+        {{ forms.textField({
+            label: 'Remember-me duration (seconds)'|t('sesame'),
+            instructions: '0 (default) turns remember-me off entirely, even for rules with it enabled. Only rules with their own “Remember me” switch on (Rules → edit a rule) offer it to visitors.'|t('sesame'),
+            id: 'rememberMeDuration',
+            name: 'rememberMeDuration',
+            type: 'number',
+            min: 0,
+            value: settings.rememberMeDuration,
+        }) }}
+    {% endif %}
+</div>
+
+<div id="pb-advanced" class="hidden">
+    {{ forms.textField({
+        label: 'Attempt limit'|t('sesame'),
+        instructions: 'Failed unlock attempts allowed per IP + protected page, before the visitor is throttled.'|t('sesame'),
+        id: 'attemptLimit',
+        name: 'attemptLimit',
+        type: 'number',
+        min: 1,
+        value: settings.attemptLimit,
+    }) }}
+
+    {{ forms.textField({
+        label: 'Attempt window (seconds)'|t('sesame'),
+        instructions: 'How long the attempt limit above applies over, before it resets.'|t('sesame'),
+        id: 'attemptWindow',
+        name: 'attemptWindow',
+        type: 'number',
+        min: 30,
+        value: settings.attemptWindow,
+    }) }}
+
+    {% if isPro %}
+        {{ forms.textField({
+            label: ('Access log retention (days)'|t('sesame') ~ ' <sup>PRO</sup>')|raw,
+            instructions: 'Access log rows older than this are purged during Craft’s garbage collection. 0 or less keeps every row indefinitely.'|t('sesame'),
+            id: 'accessLogRetentionDays',
+            name: 'accessLogRetentionDays',
+            type: 'number',
+            value: settings.accessLogRetentionDays,
+        }) }}
+    {% endif %}
+</div>
+{% endblock %}

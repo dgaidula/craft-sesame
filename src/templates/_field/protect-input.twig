@@ -1,0 +1,27 @@
+{% import '_includes/forms' as forms %}
+
+{# Per-entry gating config (CONTENT — editable on prod). A lightswitch
+   reveals the password input via Craft's standard fieldtoggle behavior, so
+   an editor sees the password field only when protection is actually on. #}
+
+{{ forms.lightswitchField({
+    label: 'Protect this entry'|t('sesame'),
+    instructions: 'Require the password below to view this entry on the front end.'|t('sesame'),
+    id: name ~ '-enabled',
+    name: name ~ '[enabled]',
+    on: value.enabled,
+    toggle: '#' ~ name ~ '-password-field',
+}) }}
+
+<div id="{{ name }}-password-field"{% if not value.enabled %} class="hidden"{% endif %}>
+    {{ forms.passwordField({
+        label: 'Password'|t('sesame'),
+        instructions: hasSecret
+            ? 'A password is already set. Enter a new one to replace it — leave blank to keep it.'|t('sesame')
+            : 'The password visitors must enter to view this entry.'|t('sesame'),
+        id: name ~ '-password',
+        name: name ~ '[password]',
+        value: '',
+        autocomplete: false,
+    }) }}
+</div>

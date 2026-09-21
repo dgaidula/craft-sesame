@@ -1,0 +1,241 @@
+{# Sesame's default password screen. Self-contained (no external fonts/assets,
+   CSP-safe) and theme-aware (prefers-color-scheme).
+
+   Overridable two ways: copy this file to `sesame/gate/challenge.twig` in
+   the site's own templates (site template roots win over the plugin's), or
+   point a single rule at its own template via the rule's "Template
+   override" field. Either way, keep the form contract below intact — the
+   `#sesame-password` id is depended on by the plugin's own tests. #}
+<!doctype html>
+<html lang="{{ craft.app.language }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>{{ craft.app.sites.currentSite.name }} — {{ 'Password required'|t('sesame') }}</title>
+    <style>
+        :root {
+            --sesame-ground: #f5f4f1;
+            --sesame-card: #ffffff;
+            --sesame-border: #e4e2dd;
+            --sesame-text: #1c1b19;
+            --sesame-muted: #7a7772;
+            --sesame-accent: #2f6f7e;
+            --sesame-accent-ring: rgba(47, 111, 126, 0.28);
+            --sesame-accent-text: #ffffff;
+            --sesame-danger: #a13b3b;
+            --sesame-shadow: 0 12px 32px -12px rgba(28, 27, 25, 0.18);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --sesame-ground: #17181a;
+                --sesame-card: #201f22;
+                --sesame-border: #34333650;
+                --sesame-text: #efeeec;
+                --sesame-muted: #96938d;
+                --sesame-accent: #5aa3b3;
+                --sesame-accent-ring: rgba(90, 163, 179, 0.32);
+                --sesame-accent-text: #0f1516;
+                --sesame-danger: #e08a8a;
+                --sesame-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.55);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px 16px;
+            background: var(--sesame-ground);
+            color: var(--sesame-text);
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        .sesame-card {
+            width: 100%;
+            max-width: 380px;
+            background: var(--sesame-card);
+            border: 1px solid var(--sesame-border);
+            border-radius: 8px;
+            box-shadow: var(--sesame-shadow);
+            padding: 40px 32px;
+            text-align: center;
+        }
+
+        .sesame-icon {
+            width: 28px;
+            height: 28px;
+            margin: 0 auto 20px;
+            color: var(--sesame-muted);
+        }
+
+        .sesame-site {
+            margin: 0 0 6px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--sesame-muted);
+        }
+
+        .sesame-message {
+            margin: 0 0 28px;
+            font-size: 17px;
+            line-height: 1.5;
+            font-weight: 500;
+            color: var(--sesame-text);
+        }
+
+        .sesame-form {
+            text-align: left;
+        }
+
+        .sesame-label {
+            display: block;
+            margin: 0 0 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--sesame-muted);
+        }
+
+        .sesame-input {
+            width: 100%;
+            padding: 11px 12px;
+            font-size: 16px;
+            font-family: inherit;
+            color: var(--sesame-text);
+            background: var(--sesame-card);
+            border: 1px solid var(--sesame-border);
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .sesame-input:focus {
+            border-color: var(--sesame-accent);
+            box-shadow: 0 0 0 3px var(--sesame-accent-ring);
+        }
+
+        .sesame-submit {
+            width: 100%;
+            margin-top: 16px;
+            padding: 11px 12px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            color: var(--sesame-accent-text);
+            background: var(--sesame-accent);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        .sesame-submit:hover {
+            opacity: 0.92;
+        }
+
+        .sesame-submit:focus-visible,
+        .sesame-input:focus-visible {
+            outline: 2px solid var(--sesame-accent);
+            outline-offset: 2px;
+        }
+
+        .sesame-status {
+            margin: 14px 0 0;
+            font-size: 13px;
+            line-height: 1.5;
+            text-align: left;
+        }
+
+        .sesame-status--error {
+            color: var(--sesame-danger);
+        }
+
+        .sesame-status--cooldown {
+            color: var(--sesame-muted);
+        }
+
+        .sesame-remember {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 14px;
+            font-size: 13px;
+            color: var(--sesame-muted);
+            cursor: pointer;
+        }
+
+        .sesame-remember input {
+            margin: 0;
+        }
+
+        @media (max-width: 360px) {
+            .sesame-card {
+                padding: 32px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sesame-card">
+        <svg class="sesame-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4.5" y="10.5" width="15" height="10" rx="2"></rect>
+            <path d="M7.5 10.5V7.5a4.5 4.5 0 0 1 9 0v3"></path>
+        </svg>
+
+        <p class="sesame-site">{{ craft.app.sites.currentSite.name }}</p>
+        <p class="sesame-message">{{ message }}</p>
+
+        <form class="sesame-form" method="post" action="{{ actionUrl('sesame/gate/unlock') }}">
+            {{ csrfInput() }}
+            <input type="hidden" name="t" value="{{ token }}">
+            <input type="hidden" name="return" value="{{ return }}">
+            {{ redirectInput(return) }}
+
+            <label class="sesame-label" for="sesame-password">{{ 'Password'|t('sesame') }}</label>
+            <input
+                class="sesame-input"
+                type="password"
+                name="password"
+                id="sesame-password"
+                autofocus
+                autocomplete="current-password"
+                required
+                {% if cooldown %}disabled{% endif %}
+            >
+
+            {# PRO. Only rendered when the matched rule opted into remember-me
+               AND the edition is Pro (see GateController::renderChallenge()) —
+               a Lite visitor never sees this control. #}
+            {% if showRememberMe %}
+                <label class="sesame-remember">
+                    <input type="checkbox" name="remember" value="1"{% if cooldown %} disabled{% endif %}>
+                    {{ 'Remember me on this device'|t('sesame') }}
+                </label>
+            {% endif %}
+
+            <button class="sesame-submit" type="submit"{% if cooldown %} disabled{% endif %}>{{ 'Continue'|t('sesame') }}</button>
+
+            {% if cooldown %}
+                <p class="sesame-status sesame-status--cooldown">{{ 'Too many attempts. Please wait a few minutes and try again.'|t('sesame') }}</p>
+            {% elseif error %}
+                <p class="sesame-status sesame-status--error">{{ error }}</p>
+            {% endif %}
+        </form>
+    </div>
+</body>
+</html>

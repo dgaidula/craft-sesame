@@ -1,0 +1,251 @@
+{% extends '_layouts/cp' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = isNew ? 'New rule'|t('sesame') : rule.label %}
+{% set fullPageForm = true %}
+{% set crumbs = [
+    { label: 'Sesame Rules'|t('sesame'), url: url('sesame/rules') },
+] %}
+
+{% block content %}
+    <input type="hidden" name="action" value="sesame/rules/save">
+    <input type="hidden" name="uid" value="{{ rule.uid }}">
+    {{ redirectInput('sesame/rules') }}
+
+    {{ forms.textField({
+        label: 'Label'|t('sesame'),
+        instructions: 'The editor-facing name for this rule (not shown to visitors).'|t('sesame'),
+        id: 'label',
+        name: 'label',
+        value: rule.label,
+        errors: rule.getErrors('label'),
+        required: true,
+        autofocus: true,
+    }) }}
+
+    {{ forms.selectField({
+        label: 'Protects'|t('sesame'),
+        instructions: 'What this rule matches. A URI glob covers any page by path; Section/Entry type cover every entry of that kind, everywhere.'|t('sesame'),
+        id: 'matchType',
+        name: 'matchType',
+        options: [
+            { label: 'A URI (glob)'|t('sesame'), value: 'uri' },
+            { label: 'A section'|t('sesame'), value: 'section' },
+            { label: 'An entry type'|t('sesame'), value: 'entryType' },
+        ],
+        value: rule.matchType,
+        toggle: true,
+        targetPrefix: '#match-',
+    }) }}
+
+    {# Only the pattern field matching the CURRENT matchType select value should
+       post as `pattern` — all three sit in the DOM at once (toggled by CSS via
+       the select's fieldtoggle behavior above), so a small script below keeps
+       exactly one of them named `pattern` as the select changes; none of them
+       carries that name by default. #}
+    <div id="match-uri"{% if rule.matchType != 'uri' %} class="hidden"{% endif %}>
+        {{ forms.textField({
+            label: 'URI pattern'|t('sesame'),
+            instructions: 'The entry’s URI, or a `*` glob. Examples: `district-resources` (exact), `district-resources/*` (that page and everything under it).'|t('sesame'),
+            id: 'pattern-uri',
+            class: 'sesame-pattern-input',
+            value: rule.matchType == 'uri' ? rule.pattern : '',
+            placeholder: 'district-resources/*',
+            errors: rule.matchType == 'uri' ? rule.getErrors('pattern') : [],
+        }) }}
+    </div>
+
+    <div id="match-section"{% if rule.matchType != 'section' %} class="hidden"{% endif %}>
+        {{ forms.selectField({
+            label: 'Section'|t('sesame'),
+            instructions: 'Every entry in this section is protected, on every page it renders.'|t('sesame'),
+            id: 'pattern-section',
+            class: 'sesame-pattern-input',
+            options: [{ label: 'Select a section…'|t('sesame'), value: '' }]|merge(sectionOptions),
+            value: rule.matchType == 'section' ? rule.pattern : '',
+            errors: rule.matchType == 'section' ? rule.getErrors('pattern') : [],
+        }) }}
+    </div>
+
+    <div id="match-entryType"{% if rule.matchType != 'entryType' %} class="hidden"{% endif %}>
+        {{ forms.selectField({
+            label: 'Entry type'|t('sesame'),
+            instructions: 'Every entry of this type is protected, regardless of which section it lives in.'|t('sesame'),
+            id: 'pattern-entryType',
+            class: 'sesame-pattern-input',
+            options: [{ label: 'Select an entry type…'|t('sesame'), value: '' }]|merge(entryTypeOptions),
+            value: rule.matchType == 'entryType' ? rule.pattern : '',
+            errors: rule.matchType == 'entryType' ? rule.getErrors('pattern') : [],
+        }) }}
+    </div>
+
+    <hr>
+
+    {{ forms.passwordField({
+        label: 'Password'|t('sesame'),
+        instructions: isNew
+            ? 'The password visitors must enter to view any page this rule protects.'|t('sesame')
+            : 'Leave blank to keep the current password.'|t('sesame'),
+        id: 'password',
+        name: 'password',
+        value: '',
+        autocomplete: false,
+        required: isNew,
+        errors: rule.getErrors('secret'),
+    }) }}
+
+    {% if not isNew %}
+        {% if rule.secretMode == 'encrypt' %}
+            <div class="field">
+                <button type="button" class="btn" id="sesame-reveal-btn" data-uid="{{ rule.uid }}">{{ 'Reveal current password'|t('sesame') }}</button>
+                <p id="sesame-reveal-result" class="light" style="margin-top:6px;"></p>
+            </div>
+        {% else %}
+            <p class="light">{{ '•••• set — this password is bcrypt-hashed and can’t be displayed. Enter a new one to replace it.'|t('sesame') }}</p>
+        {% endif %}
+    {% endif %}
+
+    <hr>
+
+    {{ forms.textareaField({
+        label: 'Custom message'|t('sesame'),
+        instructions: 'Shown on the password screen instead of the default prompt. Leave blank for “This page is protected. Enter the password to continue.”'|t('sesame'),
+        id: 'message',
+        name: 'message',
+        value: rule.message,
+        rows: 2,
+    }) }}
+
+    {{ forms.textField({
+        label: 'Template override'|t('sesame'),
+        instructions: 'Advanced. A site template path to render instead of the default password screen for this rule, e.g. `sesame/gate/challenge-district`.'|t('sesame'),
+        id: 'templateOverride',
+        name: 'templateOverride',
+        value: rule.templateOverride,
+    }) }}
+
+    {{ forms.lightswitchField({
+        label: 'Enabled'|t('sesame'),
+        instructions: 'Off leaves the rule saved but inactive — matching pages render normally, unprotected.'|t('sesame'),
+        id: 'enabled',
+        name: 'enabled',
+        on: rule.enabled,
+    }) }}
+
+    {% if isPro %}
+        <hr>
+
+        {{ forms.lightswitchField({
+            label: ('Remember me'|t('sesame') ~ ' <sup>PRO</sup>')|raw,
+            instructions: 'Let a visitor check “Remember me” on the password screen so their unlock survives beyond the browser session, for Settings → General → Remember-me duration.'|t('sesame'),
+            id: 'rememberMe',
+            name: 'rememberMe',
+            on: rule.rememberMe,
+        }) }}
+
+        {% if not isNew %}
+            <div class="field">
+                <div class="heading">
+                    <label>{{ 'Shareable link'|t('sesame') }} <sup>PRO</sup></label>
+                    <div class="instructions">
+                        <p>{{ 'Mints a one-click link that unlocks this rule for whoever opens it — no password needed. Good for emailing a district a single link.'|t('sesame') }}</p>
+                    </div>
+                </div>
+                <button type="button" class="btn" id="sesame-link-btn" data-uid="{{ rule.uid }}">{{ 'Copy shareable link'|t('sesame') }}</button>
+                <p id="sesame-link-result" class="light" style="margin-top:6px;"></p>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% js %}
+(function () {
+    var select = document.getElementById('matchType');
+    var inputs = {
+        uri: document.getElementById('pattern-uri'),
+        section: document.getElementById('pattern-section'),
+        entryType: document.getElementById('pattern-entryType'),
+    };
+
+    function syncPatternName() {
+        var active = select.value;
+        Object.keys(inputs).forEach(function (key) {
+            if (inputs[key]) {
+                inputs[key].name = key === active ? 'pattern' : '';
+            }
+        });
+    }
+
+    if (select) {
+        syncPatternName();
+        select.addEventListener('change', syncPatternName);
+    }
+})();
+
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('#sesame-reveal-btn');
+    if (!btn) {
+        return;
+    }
+    e.preventDefault();
+    var result = document.getElementById('sesame-reveal-result');
+    result.textContent = {{ 'Revealing…'|t('sesame')|json_encode|raw }};
+
+    var body = new FormData();
+    body.append('uid', btn.dataset.uid);
+    body.append({{ craft.app.config.general.csrfTokenName|json_encode|raw }}, {{ craft.app.request.csrfToken|json_encode|raw }});
+
+    fetch({{ actionUrl('sesame/rules/reveal-password')|json_encode|raw }}, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: body,
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            result.textContent = data.password
+                ? {{ 'Current password: '|t('sesame')|json_encode|raw }} + data.password
+                : {{ 'This password is written-only and can’t be revealed.'|t('sesame')|json_encode|raw }};
+        })
+        .catch(function () {
+            result.textContent = {{ 'Couldn’t reveal the password.'|t('sesame')|json_encode|raw }};
+        });
+});
+
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('#sesame-link-btn');
+    if (!btn) {
+        return;
+    }
+    e.preventDefault();
+    var result = document.getElementById('sesame-link-result');
+    result.textContent = {{ 'Minting…'|t('sesame')|json_encode|raw }};
+
+    var body = new FormData();
+    body.append('uid', btn.dataset.uid);
+    body.append({{ craft.app.config.general.csrfTokenName|json_encode|raw }}, {{ craft.app.request.csrfToken|json_encode|raw }});
+
+    fetch({{ actionUrl('sesame/rules/mint-link')|json_encode|raw }}, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: body,
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.error || !data.url) {
+                result.textContent = data.error || {{ 'Couldn’t mint a link.'|t('sesame')|json_encode|raw }};
+                return;
+            }
+            var showResult = function (copied) {
+                result.textContent = (copied ? {{ 'Copied: '|t('sesame')|json_encode|raw }} : {{ 'Link: '|t('sesame')|json_encode|raw }}) + data.url;
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(data.url).then(function () { showResult(true); }).catch(function () { showResult(false); });
+            } else {
+                showResult(false);
+            }
+        })
+        .catch(function () {
+            result.textContent = {{ 'Couldn’t mint a link.'|t('sesame')|json_encode|raw }};
+        });
+});
+{% endjs %}

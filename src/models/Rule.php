@@ -1,0 +1,79 @@
+<?php
+
+namespace dgaidula\sesame\models;
+
+use craft\base\Model;
+
+/**
+ * One row of {{%sesame_rules}} — an editor-defined match (a URI glob, a
+ * section handle, or an entry-type handle) that protects everything it
+ * matches with a single shared password.
+ *
+ * `secret`/`secretMode` hold the ALREADY-ENCODED value from
+ * {@see \dgaidula\sesame\services\Secrets::store()} — this model never
+ * carries a raw password; the CP save action (presentation layer) is
+ * responsible for calling Secrets::store() on a posted password before
+ * building/saving a Rule.
+ */
+class Rule extends Model
+{
+    public ?int $id = null;
+    public ?string $uid = null;
+    public bool $enabled = true;
+    public int $sortOrder = 0;
+    public string $label = '';
+
+    /** @var 'uri'|'section'|'entryType' */
+    public string $matchType = 'uri';
+
+    /** A URI glob (`district-resources`, `district-resources/*`), or a section/entry-type handle. */
+    public string $pattern = '';
+
+    /** The stored (encrypted or bcrypt-hashed) secret — never plaintext. */
+    public string $secret = '';
+
+    /** @var 'encrypt'|'hash' */
+    public string $secretMode = 'encrypt';
+
+    public ?string $message = null;
+    public ?string $templateOverride = null;
+
+    // --- Pro columns: present in schema, Lite ignores them. ---
+
+    /** PRO. Multiple named codes (JSON). TODO Pro: not yet read anywhere. */
+    public ?string $codesJson = null;
+
+    /** PRO. Scheduled lock/unlock. TODO Pro: not yet read anywhere. */
+    public ?string $unlockUntil = null;
+
+    /** PRO. Remember-me opt-in per rule — read by {@see toScope()} and honored by {@see \dgaidula\sesame\services\Gate::unlock()} only when `Plugin::isPro()` and `Settings::$rememberMeDuration` > 0. */
+    public bool $rememberMe = false;
+
+    public function rules(): array
+    {
+        return [
+            [['label', 'matchType', 'pattern'], 'required'],
+            [['matchType'], 'in', 'range' => ['uri', 'section', 'entryType']],
+            [['secretMode'], 'in', 'range' => ['encrypt', 'hash']],
+            [['enabled', 'rememberMe'], 'boolean'],
+            [['sortOrder'], 'integer'],
+            [['label', 'pattern', 'templateOverride'], 'string', 'max' => 255],
+            [['message', 'secret', 'codesJson'], 'string'],
+            [['unlockUntil'], 'safe'],
+        ];
+    }
+
+    /** Builds the {@see Scope} this rule protects with, for the gate to check. */
+    public function toScope(): Scope
+    {
+        return new Scope([
+            'type' => 'rule',
+            'uid' => (string) $this->uid,
+            'message' => $this->message,
+            'templateOverride' => $this->templateOverride,
+            'secret' => $this->secret,
+            'secretMode' => $this->secretMode,
+            'rememberMe' => $this->rememberMe,
+        ]);
+    }
+}

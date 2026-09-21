@@ -1,0 +1,41 @@
+{
+  "name": "dgaidula/craft-sesame",
+  "description": "Password-protect Craft pages with no template code. Admin-friendly page gating, Lite and Pro.",
+  "type": "craft-plugin",
+  "keywords": ["craft", "craft-cms", "craft-plugin"],
+  "license": "proprietary",
+  "support": {
+    "email": "support@iceboxind.com",
+    "issues": "https://github.com/dgaidula/craft-sesame/issues",
+    "source": "https://github.com/dgaidula/craft-sesame",
+    "docs": "https://github.com/dgaidula/craft-sesame/blob/main/README.md"
+  },
+  "require": {
+    "php": ">=8.2",
+    "craftcms/cms": "^5.0"
+  },
+  "require-dev": {
+    "php-cs-fixer/shim": "^3"
+  },
+  "scripts": {
+    "cs-check": "php-cs-fixer fix --dry-run --diff",
+    "cs-fix": "php-cs-fixer fix"
+  },
+  "autoload": {
+    "psr-4": {
+      "dgaidula\\sesame\\": "src/"
+    }
+  },
+  "extra": {
+    "handle": "sesame",
+    "name": "Sesame",
+    "editions": [
+      "lite",
+      "pro"
+    ],
+    "developer": "Danniel T. Gaidula",
+    "developerUrl": "https://iceboxind.com",
+    "documentationUrl": "https://github.com/dgaidula/craft-sesame/blob/main/README.md",
+    "class": "dgaidula\\sesame\\Plugin"
+  }
+}

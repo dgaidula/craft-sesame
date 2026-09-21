@@ -1,0 +1,85 @@
+{% extends '_layouts/cp' %}
+
+{% set title = 'Sesame Rules'|t('sesame') %}
+
+{% block actionButton %}
+    <a href="{{ url('sesame/rules/new') }}" class="btn submit add icon">{{ 'New rule'|t('sesame') }}</a>
+{% endblock %}
+
+{% block content %}
+    {% if rules|length %}
+        <div class="tablepane">
+            <table class="data fullwidth">
+                <thead>
+                    <tr>
+                        <th scope="col">{{ 'Label'|t('sesame') }}</th>
+                        <th scope="col">{{ 'Protects'|t('sesame') }}</th>
+                        <th scope="col">{{ 'Status'|t('sesame') }}</th>
+                        <td class="thin"></td>
+                        <td class="thin"></td>
+                        <td class="thin"></td>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for uid, rule in rules %}
+                        {% set target = {
+                            uri: 'URI: ' ~ rule.pattern,
+                            section: 'Section: ' ~ rule.pattern,
+                            entryType: 'Entry type: ' ~ rule.pattern,
+                        }[rule.matchType] ?? rule.pattern %}
+                        <tr>
+                            <th scope="row">
+                                <a href="{{ url('sesame/rules/' ~ uid) }}">{{ rule.label }}</a>
+                            </th>
+                            <td><code>{{ target }}</code></td>
+                            <td>
+                                {% if rule.enabled %}
+                                    <span class="status enabled"></span>{{ 'Enabled'|t('sesame') }}
+                                {% else %}
+                                    <span class="status disabled"></span>{{ 'Disabled'|t('sesame') }}
+                                {% endif %}
+                            </td>
+                            <td class="thin">
+                                {% if not loop.first %}
+                                    <form method="post" accept-charset="UTF-8">
+                                        {{ csrfInput() }}
+                                        <input type="hidden" name="action" value="sesame/rules/reorder">
+                                        <input type="hidden" name="uid" value="{{ uid }}">
+                                        <input type="hidden" name="direction" value="up">
+                                        {{ redirectInput('sesame/rules') }}
+                                        <button type="submit" class="move icon" title="{{ 'Move up'|t('sesame') }}" aria-label="{{ 'Move up'|t('sesame') }}"></button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                            <td class="thin">
+                                {% if not loop.last %}
+                                    <form method="post" accept-charset="UTF-8">
+                                        {{ csrfInput() }}
+                                        <input type="hidden" name="action" value="sesame/rules/reorder">
+                                        <input type="hidden" name="uid" value="{{ uid }}">
+                                        <input type="hidden" name="direction" value="down">
+                                        {{ redirectInput('sesame/rules') }}
+                                        <button type="submit" class="move icon" style="transform: rotate(180deg);" title="{{ 'Move down'|t('sesame') }}" aria-label="{{ 'Move down'|t('sesame') }}"></button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                            <td class="thin">
+                                <form method="post" accept-charset="UTF-8" onsubmit="return confirm('{{ 'Delete “{label}”?'|t('sesame', { label: rule.label })|e('js') }}');">
+                                    {{ csrfInput() }}
+                                    <input type="hidden" name="action" value="sesame/rules/delete">
+                                    <input type="hidden" name="uid" value="{{ uid }}">
+                                    {{ redirectInput('sesame/rules') }}
+                                    <button type="submit" class="delete icon" title="{{ 'Delete'|t('sesame') }}" aria-label="{{ 'Delete'|t('sesame') }}"></button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="zilch">
+            <p>{{ 'No rules yet. A rule protects everything matching a URI, section, or entry type behind one shared password.'|t('sesame') }}</p>
+        </div>
+    {% endif %}
+{% endblock %}

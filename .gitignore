@@ -1,0 +1,4 @@
+# Self-contained ignores for when this plugin lives in its own repo.
+/vendor/
+composer.lock
+.php-cs-fixer.cache

@@ -1,0 +1,22 @@
+# EditorConfig — https://editorconfig.org
+# Self-contained config for the Sesame plugin (resale / Plugin-Store
+# bound). PSR-12 spaces throughout — independent of the host site's tab house
+# style, and `root = true` so it travels and governs the plugin both while
+# embedded in a site AND once extracted to its own repo.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Markdown: two trailing spaces is a hard line break — don't strip them.
+[*.md]
+trim_trailing_whitespace = false
+
+# composer.json (2-space) + YAML (spec forbids tabs).
+[*.{json,yml,yaml}]
+indent_size = 2
