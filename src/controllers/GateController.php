@@ -80,7 +80,10 @@ class GateController extends Controller
         }
 
         $gate->unlock($scope);
-        Plugin::getInstance()->accessLog->record('unlock', $scope, Craft::$app->getRequest());
+        // A distinct 'link' event, not 'unlock': a mail scanner or chat
+        // unfurler that prefetches the link records here, and lumping those in
+        // with real password unlocks would pollute the audit trail.
+        Plugin::getInstance()->accessLog->record('link', $scope, Craft::$app->getRequest());
 
         return $this->redirect($this->safeReturn($data['target'], '/'));
     }

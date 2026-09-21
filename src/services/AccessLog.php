@@ -22,7 +22,7 @@ use iceboxind\sesame\Plugin;
  */
 class AccessLog extends Component
 {
-    /** @var 'unlock'|'fail'|'throttle' $event */
+    /** @var 'unlock'|'link'|'fail'|'throttle'|'reveal' $event */
     public function record(string $event, ?Scope $scope, Request $request): void
     {
         if (!Plugin::getInstance()->isPro() || $scope === null) {

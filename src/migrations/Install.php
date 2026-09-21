@@ -62,7 +62,7 @@ class Install extends Migration
                 'ruleId' => $this->integer(),
                 'elementId' => $this->integer(),
                 'scopeKey' => $this->string()->notNull(),
-                'event' => $this->string(20)->notNull(), // unlock | fail | throttle
+                'event' => $this->string(20)->notNull(), // unlock | link | fail | throttle | reveal
                 'ip' => $this->string(45)->notNull(), // long enough for IPv6
                 'userAgent' => $this->text(),
                 'dateCreated' => $this->dateTime()->notNull(),

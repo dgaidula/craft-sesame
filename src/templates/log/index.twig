@@ -20,7 +20,7 @@
                         <tr>
                             <td>{{ event.dateCreated|datetime('short') }}</td>
                             <td>
-                                {% set statusClass = { unlock: 'enabled', fail: 'off', throttle: 'pending' }[event.event] ?? '' %}
+                                {% set statusClass = { unlock: 'enabled', link: 'active', fail: 'off', throttle: 'pending', reveal: 'pending' }[event.event] ?? '' %}
                                 <span class="status {{ statusClass }}"></span>{{ event.event|t('sesame') }}
                             </td>
                             <td>{{ event.target }}</td>
@@ -33,7 +33,7 @@
         </div>
     {% else %}
         <div class="zilch">
-            <p>{{ 'No access log events yet. Unlock, failed-password, and throttle events on protected pages will show up here.'|t('sesame') }}</p>
+            <p>{{ 'No access log events yet. Unlock, magic-link, failed-password, and throttle events on protected pages will show up here.'|t('sesame') }}</p>
         </div>
     {% endif %}
 {% endblock %}
