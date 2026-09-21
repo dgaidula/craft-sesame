@@ -91,6 +91,9 @@ class RulesController extends Controller
             $rule->addError('secret', Craft::t('sesame', 'A password is required.'));
         }
 
+        // Did this save change WHAT the rule protects (not just its password)?
+        $targetChanged = $rule->matchType !== $storedMatchType || $rule->pattern !== $storedPattern;
+
         // Lite AUTHORING gate (P0.5). Pattern rules — a `*` wildcard, a whole
         // section, or a whole entry type — are a Pro feature; Lite keeps exact-URI
         // rules and the per-entry Protect field. This gates AUTHORING only:
@@ -101,19 +104,18 @@ class RulesController extends Controller
         // is blocked. Exact URI = matchType 'uri' with no '*'.
         if (!Plugin::getInstance()->isPro()) {
             $incomingIsPattern = $rule->matchType !== 'uri' || str_contains($rule->pattern, '*');
-            $targetChanged = $isNew
-                || $rule->matchType !== $storedMatchType
-                || $rule->pattern !== $storedPattern;
-            if ($incomingIsPattern && $targetChanged) {
+            if ($incomingIsPattern && ($isNew || $targetChanged)) {
                 $rule->addError('pattern', Craft::t('sesame', 'Wildcard, whole-section, and whole-entry-type rules are a Sesame Pro feature. On the free edition, protect an exact URL (no “*”), or use the per-entry “Sesame Protection” field.'));
             }
         }
 
-        // Changing an existing rule's password revokes every outstanding unlock
-        // (session, remember-me cookie, magic link) via an epoch bump. A new
-        // rule starts fresh, and a save that leaves the password blank doesn't
-        // touch the credential, so neither bumps.
-        $bumpEpoch = !$isNew && $password !== '';
+        // Bump the revocation epoch — cutting off every outstanding session,
+        // remember-me cookie, and magic link — when an existing rule's credential
+        // OR its target changes. A password change is the obvious case; retargeting
+        // (e.g. `members` → `board-minutes/*`) matters too, or a holder of the old
+        // unlock would keep access to content the rule was never granted for. A
+        // new rule starts fresh (nobody holds an unlock), so it never bumps.
+        $bumpEpoch = !$isNew && ($password !== '' || $targetChanged);
 
         if ($rule->hasErrors() || !Plugin::getInstance()->rules->save($rule, $bumpEpoch)) {
             Craft::$app->getSession()->setError(Craft::t('sesame', 'Couldn’t save the rule.'));
