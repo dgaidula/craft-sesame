@@ -200,26 +200,37 @@ document.addEventListener('click', function (e) {
     }
     e.preventDefault();
     var result = document.getElementById('sesame-reveal-result');
-    result.textContent = {{ 'Revealing…'|t('sesame')|json_encode|raw }};
 
-    var body = new FormData();
-    body.append('uid', btn.dataset.uid);
-    body.append({{ craft.app.config.general.csrfTokenName|json_encode|raw }}, {{ craft.app.request.csrfToken|json_encode|raw }});
+    var doReveal = function () {
+        result.textContent = {{ 'Revealing…'|t('sesame')|json_encode|raw }};
 
-    fetch({{ actionUrl('sesame/rules/reveal-password')|json_encode|raw }}, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: body,
-    })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            result.textContent = data.password
-                ? {{ 'Current password: '|t('sesame')|json_encode|raw }} + data.password
-                : {{ 'This password is written-only and can’t be revealed.'|t('sesame')|json_encode|raw }};
+        var body = new FormData();
+        body.append('uid', btn.dataset.uid);
+        body.append({{ craft.app.config.general.csrfTokenName|json_encode|raw }}, {{ craft.app.request.csrfToken|json_encode|raw }});
+
+        fetch({{ actionUrl('sesame/rules/reveal-password')|json_encode|raw }}, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: body,
         })
-        .catch(function () {
-            result.textContent = {{ 'Couldn’t reveal the password.'|t('sesame')|json_encode|raw }};
-        });
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                result.textContent = data.password
+                    ? {{ 'Current password: '|t('sesame')|json_encode|raw }} + data.password
+                    : {{ 'This password is written-only and can’t be revealed.'|t('sesame')|json_encode|raw }};
+            })
+            .catch(function () {
+                result.textContent = {{ 'Couldn’t reveal the password.'|t('sesame')|json_encode|raw }};
+            });
+    };
+
+    // Revealing a secret requires an elevated (re-authenticated) session — the
+    // manager shows the password prompt when needed, then runs the callback.
+    if (window.Craft && Craft.elevatedSessionManager) {
+        Craft.elevatedSessionManager.requireElevatedSession(doReveal);
+    } else {
+        doReveal();
+    }
 });
 
 document.addEventListener('click', function (e) {

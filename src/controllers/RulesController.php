@@ -208,10 +208,22 @@ class RulesController extends Controller
     public function actionRevealPassword(): Response
     {
         $this->requirePostRequest();
+        $this->requireAcceptsJson();
+        // Disclosing a stored secret is sensitive: require a re-authenticated
+        // (elevated) session, so an unattended or hijacked CP session can't
+        // reveal passwords without the user re-entering theirs. The edit screen
+        // drives this through Craft.elevatedSessionManager before it fetches.
+        $this->requireElevatedSession();
+
         $uid = (string) Craft::$app->getRequest()->getRequiredBodyParam('uid');
 
         $rule = Plugin::getInstance()->rules->getByUid($uid);
         $password = $rule ? Plugin::getInstance()->secrets->reveal($rule->secret, $rule->secretMode) : null;
+
+        // Audit the disclosure (Pro only, like every other access-log write).
+        if ($rule !== null) {
+            Plugin::getInstance()->accessLog->record('reveal', $rule->toScope(), Craft::$app->getRequest());
+        }
 
         return $this->asJson(['password' => $password]);
     }
