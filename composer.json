@@ -2,7 +2,7 @@
   "name": "iceboxind/craft-sesame",
   "description": "Password-protect Craft pages with no template code. Admin-friendly page gating, Lite and Pro.",
   "type": "craft-plugin",
-  "keywords": ["craft", "craft-cms", "craft-plugin"],
+  "keywords": ["craft", "craft-cms", "craft-plugin", "password", "protect", "gate", "private", "members", "access"],
   "license": "proprietary",
   "support": {
     "email": "support@iceboxind.com",
@@ -36,6 +36,7 @@
     "developer": "Danniel T. Gaidula",
     "developerUrl": "https://iceboxind.com",
     "documentationUrl": "https://github.com/dgaidula/craft-sesame/blob/main/README.md",
+    "changelogUrl": "https://raw.githubusercontent.com/dgaidula/craft-sesame/main/CHANGELOG.md",
     "class": "iceboxind\\sesame\\Plugin"
   }
 }
