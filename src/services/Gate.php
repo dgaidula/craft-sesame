@@ -77,6 +77,10 @@ class Gate extends Component
         // visitor who arrived with an attacker-fixed session id must not keep
         // it. Regenerate before storing the unlock so the granted access lives
         // only under the fresh id (existing session data is migrated).
+        // open() first — regenerateID() is a no-op on an inactive session, and
+        // we must not depend on unrelated Craft code having opened it on this
+        // request (open() is idempotent when already active).
+        $session->open();
         $session->regenerateID(true);
 
         // Store the epoch this unlock was granted under, not a bare `true`, so
