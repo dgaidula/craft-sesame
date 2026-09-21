@@ -178,3 +178,85 @@ Proposed price: Pro **$49 + $19/yr**. Defensible and reversible; unmeasured. **[
 - Whether a Lite without pattern rules pulls installs when Knock Knock gives regex protection away free.
 
 - `Secrets::verify()` and the `markProtectedWithoutSecret` path were not read in this pass.
+
+## Pre-launch flags — design verdicts (Fable, 2026-09-19)
+
+Written after reading the three flags in `EFFORT.md`, the current `fields/Protect.php`
+and `services/Secrets.php`, and the relevant Craft 5.10.11 source in the testbed’s
+`vendor/`. The API names below were checked there, not recalled. The repro on the testbed
+is still worth doing for (1); the fix for each is settled enough to build straight after.
+
+### (1) Provisional-draft autosave loses the password — confirmed by construction, fix it
+
+`Protect::afterElementSave()` keys the secret by `$element->uid` and never asks whether
+the element is a draft or a revision. Craft’s edit screen autosaves to a **provisional
+draft** — a separate element with its own UID — so the typed password lands in a row keyed
+by the draft. `Drafts::applyDraft()` then saves the canonical through
+`updateCanonicalElement()` (`services/Drafts.php:330`): the content column (`enabled`)
+copies over, the transient `password` does not, so the canonical save hits the
+“enabled, no password, none stored” branch and calls `markProtectedWithoutSecret()`.
+Result: the page is locked and nobody, including the editor, can open it. Fail-closed, but
+a launch blocker — this is the first thing an editor does.
+
+Build (both editions):
+
+- In `afterElementSave()`: `if (ElementHelper::isRevision($element)) return;` — revisions are snapshots and must never write, read, or tombstone a secret. (`craft\helpers\ElementHelper::isRevision()`, `isDraft()`, `isDraftOrRevision()` — `helpers/ElementHelper.php:499–547`.)
+
+- Keep storing a draft’s posted password under the **draft’s** UID (as now — it must not change the live page before publish).
+
+- Add a handler on `craft\services\Drafts::EVENT_AFTER_APPLY_DRAFT` (`services/Drafts.php:361`). The `DraftEvent` carries `$event->draft` and `$event->canonical` (`events/DraftEvent.php:24, 49`). Move the secret row from the draft’s UID to the canonical’s UID — an upsert that **replaces** whatever the canonical save just wrote, including the protected-without-secret placeholder — and bump the canonical’s epoch if the secret actually changed. The event fires *after* the canonical save inside `applyDraft()`, so this ordering is what makes the end state correct.
+
+- On draft discard, delete the draft-keyed row (`Elements::EVENT_AFTER_DELETE_ELEMENT` where `ElementHelper::isDraft()`), and add a GC pass that removes rows whose UID no longer matches any element — orphans from drafts that were never applied.
+
+- Also: when a **canonical** save arrives with `enabled = true`, `password = null`, and no secret stored, and it is not the apply path, that is an editor who turned protection on without typing a password. Fail closed as now, but say so in the CP — a validation error on the field (“Enter a password, or turn protection off”) beats a silently locked page.
+
+Test on the testbed: type a password in the field, wait for the autosave, then Save; open the page as a visitor; the typed password must unlock it. Then discard a draft and confirm no row is left behind.
+
+### (2) Multi-site fail-open — close it structurally, do not patch the race
+
+The flagged scenario needs the field to be *translatable*. Craft offers that setting for
+any field whose value lives in the content column: `Field::supportedTranslationMethods()`
+returns every method unless `dbType()` is null (`base/Field.php:286–296`), and
+`Protect` stores `{enabled}` there. Protection is a property of the entry, not of one of
+its translations, so make the field untranslatable by declaration:
+
+```php
+public static function supportedTranslationMethods(): array
+{
+    return [self::TRANSLATION_METHOD_NONE];
+}
+```
+
+With that, `enabled` propagates identically to every site, the shared UID-keyed row is
+never tombstoned by one site while another still expects it, and the per-site password
+question is closed rather than deferred. If per-site passwords are ever wanted, key the
+table by `(elementUid, siteId)` then — not now. Also stop `disableForEntry()` from being
+reachable from a non-canonical save (covered by the revision/draft guards above).
+
+### (3) DummyCache makes the throttle a no-op — detect now, remove the dependency in P1
+
+A brute-force limiter whose precondition is “the site’s cache is real” has a silent
+failure mode, and `yii\caching\DummyCache` is a legitimate config. Two steps:
+
+- **Now (cheap):** at plugin init, if `Craft::$app->getCache() instanceof \yii\caching\DummyCache`, log a warning and show a persistent notice on Sesame’s settings screen: “Brute-force throttling is disabled because this site’s cache component is DummyCache.” Say the same in the README’s throttle bullet.
+
+- **P1, before scheduling if you want a throttle with no config dependency:** a small `{{%sesame_attempts}}` table — `(bucketKey, windowStart, count)` with a unique key on `(bucketKey, windowStart)` — updated with a single `INSERT … ON DUPLICATE KEY UPDATE count = count + 1` (MySQL) / `ON CONFLICT … DO UPDATE` (Postgres), rows purged in GC. That also makes the throttle deterministic in the HTTP tests. Keep the cache path as the fast default if you like; the DB path is the fallback when the cache is a dummy.
+
+### The dangling design-doc reference — recommendation
+
+`services/Gate.php:110` still cites `SESAME-PRO-BRIEF.md §C`, a document that is not in
+this repo. In a public repo a citation to a file nobody can open reads as an unfinished
+edit. Strip the citation and keep the sentence’s substance — the paragraph already explains
+the tradeoff in full. Only commit the brief itself under `docs/` if it is client-clean
+and you want it public; otherwise the reference goes.
+
+### What this pass changed
+
+`README.md` only: the editions table now shows the decided Lite line (pattern rules are
+Pro; exact-URI rules and the field are Lite, both with their own passwords), the pitch
+reads “running access to whole areas of a site,” competitor names are out of the table,
+the client vocabulary is out of the prose, the leak-sealing promise is roadmap language
+behind the three ordered Pro features, and prose punctuation is typographic (code spans and
+blocks untouched — verified). Please re-read the “Revocation” and “only creating or
+changing one needs Pro” claims against the code you shipped for P0.2 and P0.5; the wording
+follows the spec, not a fresh read of the diff.
