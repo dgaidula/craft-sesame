@@ -59,10 +59,10 @@ the people who need to get in without a password.
 | Access log — who unlocked what, and when, with retention | — | ✅ |
 | Remember me — unlocks that survive a browser restart, per rule | — | ✅ |
 | Scheduled lock and unlock, by date — protect only within a time window | — | ✅ |
-| Multiple named codes per rule, each with a label, an expiry, and a revoke | — | roadmap |
+| Multiple named codes per rule, each with a label, an expiry, and a revoke | — | ✅ |
 | Control-panel branding of the password screen | — | roadmap |
 
-The roadmap rows are the next two Pro features, in that order. A pattern
+The roadmap row is the next Pro feature. A pattern
 rule created on Pro keeps protecting its pages if the site later moves to
 Lite; only creating one, or changing what it matches, needs Pro — its
 password, its on/off switch, and deleting it stay editable on Lite.
@@ -164,6 +164,15 @@ Pro adds the tools for running access, not just setting it.
   Pro can create or change one. To keep a scheduled transition honest under a
   full-page cache, Sesame never lets a scheduled URL be statically cached (a
   page cached while public can’t linger past its lock time).
+- **Multiple named codes.** A rule’s password is its first code; on Pro, add
+  more from the rule’s edit screen — each with a label, an optional expiry, and
+  its own shareable link — so you can hand out **a separate code per audience**
+  (“send District A its own code and link”). Any active code unlocks the page;
+  the one that matched is stamped on every access-log row. **Revoke** or expire a
+  single code to cut off just its holders and kill its links, without touching
+  anyone else or changing the shared password; changing the primary password
+  still locks everyone out. Up to 25 codes per rule. Lite has one code — the
+  Password field.
 
 ## Template usage / overriding the password screen
 

@@ -43,7 +43,8 @@ class LogController extends Controller
 
         $elements = Craft::$app->getElements();
         $users = Craft::$app->getUsers();
-        $events = array_map(function (array $row) use ($rulesById, $elements, $users): array {
+        $codes = Plugin::getInstance()->codes;
+        $events = array_map(function (array $row) use ($rulesById, $elements, $users, $codes): array {
             if (!empty($row['ruleId']) && isset($rulesById[(int) $row['ruleId']])) {
                 $row['target'] = $rulesById[(int) $row['ruleId']];
             } elseif (!empty($row['elementId'])) {
@@ -57,6 +58,12 @@ class LogController extends Controller
             // front-end events have no userId.
             $row['user'] = !empty($row['userId'])
                 ? ($users->getUserById((int) $row['userId'])?->username ?? Craft::t('sesame', 'User #{id}', ['id' => $row['userId']]))
+                : '';
+
+            // The named code used (if any) — its label, or a short id when the
+            // code has been deleted since.
+            $row['code'] = !empty($row['codeId'])
+                ? ($codes->getByUid((string) $row['codeId'])?->label ?: mb_substr((string) $row['codeId'], 0, 8))
                 : '';
 
             return $row;

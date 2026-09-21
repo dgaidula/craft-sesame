@@ -207,6 +207,91 @@ class RulesController extends Controller
         return $this->asJson(['ok' => true]);
     }
 
+    // --- PRO: named-code management (the code-list UI on the rule edit screen) ---
+    // Thin wrappers over the Codes service; all POST + JSON, permission-gated by
+    // beforeAction() and Pro-gated here.
+
+    /** PRO. Adds a named code (label + password + optional expiry) to a rule. */
+    public function actionAddCode(): Response
+    {
+        [$request, $ruleUid] = $this->requireCodeManagement();
+
+        $password = (string) $request->getBodyParam('password', '');
+        if ($password === '') {
+            return $this->asJson(['error' => Craft::t('sesame', 'A password is required.')]);
+        }
+        $label = trim((string) $request->getBodyParam('label', '')) ?: null;
+
+        $code = Plugin::getInstance()->codes->add($ruleUid, $password, $label, $this->postedExpiry());
+        if ($code === null) {
+            return $this->asJson(['error' => Craft::t('sesame', 'Couldn’t add the code — a rule can have at most {n} codes.', ['n' => \iceboxind\sesame\services\Codes::MAX_CODES])]);
+        }
+
+        return $this->asJson(['ok' => true]);
+    }
+
+    /** PRO. Relabels a code and/or changes its expiry. */
+    public function actionUpdateCode(): Response
+    {
+        [$request] = $this->requireCodeManagement(false);
+
+        $codeId = (string) $request->getRequiredBodyParam('codeId');
+        $codes = Plugin::getInstance()->codes;
+        $codes->relabel($codeId, trim((string) $request->getBodyParam('label', '')) ?: null);
+        $codes->setExpiry($codeId, $this->postedExpiry());
+
+        return $this->asJson(['ok' => true]);
+    }
+
+    /** PRO. Revokes a code (cuts off its holders; the code stays listed as revoked). */
+    public function actionRevokeCode(): Response
+    {
+        [$request] = $this->requireCodeManagement(false);
+        Plugin::getInstance()->codes->revoke((string) $request->getRequiredBodyParam('codeId'));
+        return $this->asJson(['ok' => true]);
+    }
+
+    /** PRO. Deletes a code outright (refused for a rule's last/only code). */
+    public function actionDeleteCode(): Response
+    {
+        [$request] = $this->requireCodeManagement(false);
+        $ok = Plugin::getInstance()->codes->delete((string) $request->getRequiredBodyParam('codeId'));
+        return $this->asJson($ok ? ['ok' => true] : ['error' => Craft::t('sesame', 'A rule must keep at least one code.')]);
+    }
+
+    /**
+     * Shared preamble for the code-management actions: POST + JSON + Pro gate.
+     * When $needRule is true, also requires and validates the `uid` rule param.
+     *
+     * @return array{0:\craft\web\Request,1:string}
+     */
+    private function requireCodeManagement(bool $needRule = true): array
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+        if (!Plugin::getInstance()->isPro()) {
+            throw new NotFoundHttpException(Craft::t('sesame', 'Named codes are a Sesame Pro feature.'));
+        }
+
+        $request = Craft::$app->getRequest();
+        $ruleUid = '';
+        if ($needRule) {
+            $ruleUid = (string) $request->getRequiredBodyParam('uid');
+            if (Plugin::getInstance()->rules->getByUid($ruleUid) === null) {
+                throw new NotFoundHttpException(Craft::t('sesame', 'Rule not found.'));
+            }
+        }
+
+        return [$request, $ruleUid];
+    }
+
+    /** Parses the posted `expiresAt` into a UTC datetime string, or null when blank. */
+    private function postedExpiry(): ?string
+    {
+        $dt = DateTimeHelper::toDateTime(Craft::$app->getRequest()->getBodyParam('expiresAt'));
+        return $dt ? Db::prepareDateForDb($dt) : null;
+    }
+
     /**
      * PRO. Mints a shareable magic-link URL for one rule ("Copy shareable
      * link" on the Rules edit screen) — POST-only, JSON response, gated by
@@ -307,9 +392,29 @@ class RulesController extends Controller
     {
         $entries = Craft::$app->getEntries();
 
+        $codes = Plugin::getInstance()->codes;
+
         // Code one's storage mode drives the reveal-password UI (encrypt → can
         // reveal; hash → write-only). Null on a new rule (no code yet).
-        $codeOne = $rule->uid ? Plugin::getInstance()->codes->codeOne((string) $rule->uid) : null;
+        $codeOne = $rule->uid ? $codes->codeOne((string) $rule->uid) : null;
+
+        // Additional codes (2..N) for the Pro code-management list — code one is
+        // managed by the top Password field, so it's dropped here. Prepared for
+        // the template: expiry as a system-tz DateTime, and a status label.
+        $additionalCodes = [];
+        if (Plugin::getInstance()->isPro() && $rule->uid) {
+            $all = $codes->forRule((string) $rule->uid);
+            array_shift($all); // drop code one
+            foreach ($all as $c) {
+                $additionalCodes[] = [
+                    'uid' => $c->uid,
+                    'label' => $c->label,
+                    'expiresAt' => $c->expiresAt ? DateTimeHelper::toDateTime($c->expiresAt) : null,
+                    'canReveal' => $c->secretMode === 'encrypt',
+                    'status' => $c->revokedAt !== null ? 'revoked' : ($c->isActive() ? 'active' : 'expired'),
+                ];
+            }
+        }
 
         $sectionOptions = array_map(
             static fn($section) => ['label' => $section->name, 'value' => $section->handle],
@@ -336,6 +441,8 @@ class RulesController extends Controller
             'protectUntilDate' => $rule->protectUntil ? DateTimeHelper::toDateTime($rule->protectUntil) : null,
             // 'encrypt' | 'hash' | null — code one's storage mode for the reveal UI.
             'codeOneMode' => $codeOne?->secretMode,
+            // Codes 2..N for the Pro code-management list (empty on Lite / new).
+            'additionalCodes' => $additionalCodes,
         ]);
     }
 }

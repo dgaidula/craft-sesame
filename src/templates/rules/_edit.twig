@@ -217,11 +217,66 @@
                 <div class="heading">
                     <label>{{ 'Shareable link'|t('sesame') }} <sup>PRO</sup></label>
                     <div class="instructions">
-                        <p>{{ 'Mints a one-click link that unlocks this rule for whoever opens it — no password needed. Good for emailing someone a single link instead of a shared password.'|t('sesame') }}</p>
+                        <p>{{ 'Mints a one-click link for the primary code (the Password above) that unlocks this rule for whoever opens it — no password needed. Good for emailing someone a link instead of a shared password. Each named code below has its own link.'|t('sesame') }}</p>
                     </div>
                 </div>
                 <button type="button" class="btn" id="sesame-link-btn" data-uid="{{ rule.uid }}">{{ 'Copy shareable link'|t('sesame') }}</button>
                 <p id="sesame-link-result" class="light" style="margin-top:6px;"></p>
+            </div>
+
+            {# Named codes (codes 2..N). The primary code is the Password field
+               above; these are extra credentials, each with its own label,
+               expiry, revoke, and link — "send District A its own code". All
+               actions call the Codes service via the code-* endpoints and reload
+               on change. #}
+            <div class="field" id="sesame-codes" data-uid="{{ rule.uid }}">
+                <div class="heading">
+                    <label>{{ 'Named codes'|t('sesame') }} <sup>PRO</sup></label>
+                    <div class="instructions">
+                        <p>{{ 'Hand out separate codes — each with its own label, optional expiry, individual revoke, and its own shareable link. Revoking or expiring one cuts off just its holders. Up to 25 codes per rule.'|t('sesame') }}</p>
+                    </div>
+                </div>
+
+                {% if additionalCodes|length %}
+                    <table class="data fullwidth" style="margin-bottom:12px;">
+                        <thead>
+                            <tr>
+                                <th scope="col">{{ 'Label'|t('sesame') }}</th>
+                                <th scope="col">{{ 'Expires'|t('sesame') }}</th>
+                                <th scope="col">{{ 'Status'|t('sesame') }}</th>
+                                <th scope="col"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in additionalCodes %}
+                                <tr data-code="{{ c.uid }}">
+                                    <td><input type="text" class="text sesame-code-label" value="{{ c.label }}" placeholder="{{ 'Label'|t('sesame') }}"></td>
+                                    <td><input type="date" class="text sesame-code-exp" value="{{ c.expiresAt ? c.expiresAt|date('Y-m-d') : '' }}"></td>
+                                    <td>
+                                        {% set statusClass = { active: 'enabled', revoked: 'off', expired: 'pending' }[c.status] ?? '' %}
+                                        <span class="status {{ statusClass }}"></span>{{ c.status|t('sesame') }}
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn small sesame-code-save">{{ 'Save'|t('sesame') }}</button>
+                                        {% if c.canReveal %}<button type="button" class="btn small sesame-code-reveal">{{ 'Reveal'|t('sesame') }}</button>{% endif %}
+                                        <button type="button" class="btn small sesame-code-link">{{ 'Copy link'|t('sesame') }}</button>
+                                        {% if c.status == 'active' %}<button type="button" class="btn small sesame-code-revoke">{{ 'Revoke'|t('sesame') }}</button>{% endif %}
+                                        <button type="button" class="btn small sesame-code-delete">{{ 'Delete'|t('sesame') }}</button>
+                                        <span class="sesame-code-result light" style="margin-left:6px;"></span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+
+                <div class="sesame-addcode">
+                    <input type="text" id="sesame-newcode-label" class="text" placeholder="{{ 'Label (e.g. District A)'|t('sesame') }}" style="max-width:180px;">
+                    <input type="password" id="sesame-newcode-pw" class="text" placeholder="{{ 'Password'|t('sesame') }}" autocomplete="new-password" style="max-width:160px;">
+                    <input type="date" id="sesame-newcode-exp" class="text" title="{{ 'Optional expiry'|t('sesame') }}">
+                    <button type="button" class="btn" id="sesame-addcode-btn">{{ 'Add code'|t('sesame') }}</button>
+                    <span id="sesame-addcode-result" class="light" style="margin-left:6px;"></span>
+                </div>
             </div>
         {% endif %}
     {% endif %}
@@ -360,4 +415,87 @@ document.addEventListener('click', function (e) {
             result.textContent = {{ 'Couldn’t revoke access.'|t('sesame')|json_encode|raw }};
         });
 });
+
+// --- PRO: named-code management ---
+(function () {
+    var wrap = document.getElementById('sesame-codes');
+    if (!wrap) {
+        return;
+    }
+    var ruleUid = wrap.dataset.uid;
+    var CSRF_NAME = {{ craft.app.config.general.csrfTokenName|json_encode|raw }};
+    var CSRF = {{ craft.app.request.csrfToken|json_encode|raw }};
+    var URLS = {
+        add: {{ actionUrl('sesame/rules/add-code')|json_encode|raw }},
+        update: {{ actionUrl('sesame/rules/update-code')|json_encode|raw }},
+        revoke: {{ actionUrl('sesame/rules/revoke-code')|json_encode|raw }},
+        del: {{ actionUrl('sesame/rules/delete-code')|json_encode|raw }},
+        link: {{ actionUrl('sesame/rules/mint-link')|json_encode|raw }},
+        reveal: {{ actionUrl('sesame/rules/reveal-password')|json_encode|raw }}
+    };
+    function post(url, params) {
+        var body = new FormData();
+        body.append(CSRF_NAME, CSRF);
+        Object.keys(params).forEach(function (k) { body.append(k, params[k]); });
+        return fetch(url, { method: 'POST', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: body })
+            .then(function (r) { return r.json(); });
+    }
+    function rowOf(el) { return el.closest('tr[data-code]'); }
+    function resultEl(row) { return row.querySelector('.sesame-code-result'); }
+
+    // Add a code
+    document.getElementById('sesame-addcode-btn').addEventListener('click', function () {
+        var out = document.getElementById('sesame-addcode-result');
+        var pw = document.getElementById('sesame-newcode-pw').value;
+        if (!pw) { out.textContent = {{ 'Enter a password for the new code.'|t('sesame')|json_encode|raw }}; return; }
+        out.textContent = {{ 'Adding…'|t('sesame')|json_encode|raw }};
+        post(URLS.add, {
+            uid: ruleUid,
+            password: pw,
+            label: document.getElementById('sesame-newcode-label').value,
+            expiresAt: document.getElementById('sesame-newcode-exp').value
+        }).then(function (d) {
+            if (d.ok) { window.location.reload(); }
+            else { out.textContent = d.error || {{ 'Couldn’t add the code.'|t('sesame')|json_encode|raw }}; }
+        }).catch(function () { out.textContent = {{ 'Couldn’t add the code.'|t('sesame')|json_encode|raw }}; });
+    });
+
+    // Delegated row actions
+    wrap.addEventListener('click', function (e) {
+        var btn = e.target;
+        var row = rowOf(btn);
+        if (!row) { return; }
+        var codeId = row.dataset.code;
+        var out = resultEl(row);
+
+        if (btn.classList.contains('sesame-code-save')) {
+            out.textContent = {{ 'Saving…'|t('sesame')|json_encode|raw }};
+            post(URLS.update, { codeId: codeId, label: row.querySelector('.sesame-code-label').value, expiresAt: row.querySelector('.sesame-code-exp').value })
+                .then(function (d) { d.ok ? window.location.reload() : (out.textContent = d.error || {{ 'Couldn’t save.'|t('sesame')|json_encode|raw }}); });
+        } else if (btn.classList.contains('sesame-code-revoke')) {
+            if (!window.confirm({{ 'Revoke this code? Everyone holding it, and its links, are cut off.'|t('sesame')|json_encode|raw }})) { return; }
+            post(URLS.revoke, { codeId: codeId }).then(function (d) { d.ok ? window.location.reload() : (out.textContent = d.error || 'Error'); });
+        } else if (btn.classList.contains('sesame-code-delete')) {
+            if (!window.confirm({{ 'Delete this code for good?'|t('sesame')|json_encode|raw }})) { return; }
+            post(URLS.del, { codeId: codeId }).then(function (d) { d.ok ? window.location.reload() : (out.textContent = d.error || {{ 'Couldn’t delete.'|t('sesame')|json_encode|raw }}); });
+        } else if (btn.classList.contains('sesame-code-link')) {
+            out.textContent = {{ 'Minting…'|t('sesame')|json_encode|raw }};
+            post(URLS.link, { uid: ruleUid, codeId: codeId }).then(function (d) {
+                if (d.error || !d.url) { out.textContent = d.error || {{ 'Couldn’t mint a link.'|t('sesame')|json_encode|raw }}; return; }
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(d.url).then(function () { out.textContent = {{ 'Copied: '|t('sesame')|json_encode|raw }} + d.url; }, function () { out.textContent = d.url; });
+                } else { out.textContent = d.url; }
+            });
+        } else if (btn.classList.contains('sesame-code-reveal')) {
+            var doReveal = function () {
+                out.textContent = {{ 'Revealing…'|t('sesame')|json_encode|raw }};
+                post(URLS.reveal, { uid: ruleUid, codeId: codeId }).then(function (d) {
+                    out.textContent = d.password ? ({{ 'Password: '|t('sesame')|json_encode|raw }} + d.password) : {{ 'Written-only — can’t be shown.'|t('sesame')|json_encode|raw }};
+                });
+            };
+            if (window.Craft && Craft.elevatedSessionManager) { Craft.elevatedSessionManager.requireElevatedSession(doReveal); }
+            else { doReveal(); }
+        }
+    });
+})();
 {% endjs %}
