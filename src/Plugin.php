@@ -264,12 +264,14 @@ class Plugin extends BasePlugin
     // protect action; rules are single-add only via the Rules CP screen.
 
     /**
-     * PRO retention purge for {{%sesame_access_log}} — mirrors Downtoll's
+     * Retention purge for {{%sesame_access_log}} — mirrors Downtoll's
      * `Submissions::purgeExpired()` / `registerGarbageCollection()` pattern.
-     * Fires during `php craft gc` and Craft's scheduled garbage collection;
-     * `AccessLog::purgeExpired()` itself no-ops when `accessLogRetentionDays`
-     * is 0 or less, and this handler no-ops entirely on Lite (nothing was
-     * ever written to purge).
+     * Fires during `php craft gc` and Craft's scheduled garbage collection.
+     * Runs on EVERY edition, not just Pro: only *writing* the log is a Pro
+     * feature, so after a Pro→Lite downgrade the rows written while Pro must
+     * still age out. `AccessLog::purgeExpired()` no-ops when
+     * `accessLogRetentionDays` is 0 or less, and there is nothing to delete on
+     * an install that was never Pro, so this is harmless on Lite.
      */
     private function registerGarbageCollection(): void
     {
@@ -277,9 +279,7 @@ class Plugin extends BasePlugin
             Gc::class,
             Gc::EVENT_RUN,
             function (): void {
-                if ($this->isPro()) {
-                    $this->accessLog->purgeExpired();
-                }
+                $this->accessLog->purgeExpired();
             }
         );
     }
