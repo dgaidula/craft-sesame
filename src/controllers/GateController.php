@@ -5,6 +5,7 @@ namespace iceboxind\sesame\controllers;
 use Craft;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
+use craft\web\View;
 use iceboxind\sesame\models\Scope;
 use iceboxind\sesame\Plugin;
 use nystudio107\seomatic\Seomatic;
@@ -190,7 +191,19 @@ class GateController extends Controller
         // password — see PATTERNS.md §8 for what this does and doesn't cover.
         Craft::$app->getResponse()->getHeaders()->set('X-Robots-Tag', 'none');
 
-        $template = $scope->templateOverride ?: 'sesame/gate/challenge';
+        // A per-rule template override is only validated as `string, max 255`
+        // at save (Rule::rules), so a typo, a path to a template that was later
+        // deleted, or a traversal attempt would 500 the challenge — which fails
+        // closed for the visitor but lets anyone with `sesame:manageRules` take a
+        // protected page down. Fall back to the built-in screen unless the
+        // override actually resolves as a site template (traversal paths don't).
+        $template = 'sesame/gate/challenge';
+        if (
+            $scope->templateOverride
+            && Craft::$app->getView()->doesTemplateExist($scope->templateOverride, View::TEMPLATE_MODE_SITE)
+        ) {
+            $template = $scope->templateOverride;
+        }
 
         return $this->renderTemplate($template, [
             'token' => $token,
