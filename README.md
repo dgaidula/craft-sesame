@@ -25,8 +25,13 @@ on Craft 4.
 4. **Stores the secret encrypted-at-rest by default** (reversible, so an
    admin can reveal and re-share a page code later) — or bcrypt-hashed
    (write-only) if you turn that on in settings.
-5. **Throttles guesses** — failed attempts are rate-limited per IP per
-   protected page before the password is even compared.
+5. **Throttles guesses** — failed attempts are rate-limited before the
+   password is even compared, in a fixed window, per IP *and* by a higher
+   IP-independent per-page ceiling (so an attacker rotating `X-Forwarded-For`
+   can’t buy unlimited tries). The per-page ceiling is shared, so a determined
+   attacker can push a single page into a short cooldown for everyone — the
+   deliberate trade for closing the rotation bypass; the real fix for a proxy
+   that hides client IPs is your site’s `trustedHosts` config.
 6. **Ships a real password screen** — a small, deliberate design, themeable
    light/dark, fully overridable per site or per rule.
 

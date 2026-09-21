@@ -7,10 +7,10 @@ use craft\base\Component;
 use iceboxind\sesame\Plugin;
 
 /**
- * Brute-force throttling for the unlock endpoint (PATTERNS.md §5 — Craft has
- * no general front-end rate limiter). Failed attempts are counted in Craft's
- * data cache and checked BEFORE the password compare, so a flood also can't
- * spend bcrypt CPU.
+ * Brute-force throttling for the unlock endpoint (Craft has no general
+ * front-end rate limiter). Failed attempts are counted in Craft's data cache
+ * and checked BEFORE the password compare, so a flood also can't spend bcrypt
+ * CPU.
  *
  * Two buckets, both required (P0.3):
  *  - **per IP + scope** — the tight, everyday limit (`attemptLimit`).
@@ -23,6 +23,13 @@ use iceboxind\sesame\Plugin;
  *    reverse proxy that hides the client IP is the site's `trustedHosts`
  *    config so `getUserIP()` returns the true client — this is defense in depth
  *    on top of that.)
+ *
+ * FIXED window, not sliding: the counter key carries the window number
+ * (`floor(time() / attemptWindow)`), so each window starts fresh. A steady
+ * trickle of organic wrong guesses can therefore never accumulate ACROSS
+ * windows into a lockout that no attacker caused — it resets every window —
+ * and a determined attacker must re-send a full burst each window rather than
+ * hold a scope down with one slow drip.
  */
 class Throttle extends Component
 {
@@ -37,21 +44,24 @@ class Throttle extends Component
     public function tooMany(string $ip, string $scopeKey): bool
     {
         $cache = Craft::$app->getCache();
-        $limit = Plugin::getInstance()->getSettings()->attemptLimit;
+        $settings = Plugin::getInstance()->getSettings();
+        $limit = $settings->attemptLimit;
+        $w = $this->windowNumber($settings->attemptWindow);
 
-        if ((int) $cache->get($this->cacheKey($ip, $scopeKey)) >= $limit) {
+        if ((int) $cache->get($this->cacheKey($ip, $scopeKey, $w)) >= $limit) {
             return true;
         }
 
-        return (int) $cache->get($this->scopeCacheKey($scopeKey)) >= $limit * self::SCOPE_LIMIT_MULTIPLIER;
+        return (int) $cache->get($this->scopeCacheKey($scopeKey, $w)) >= $limit * self::SCOPE_LIMIT_MULTIPLIER;
     }
 
-    /** Records one failed attempt against both buckets, (re)starting each window's TTL. */
+    /** Records one failed attempt against both buckets for the current fixed window. */
     public function record(string $ip, string $scopeKey): void
     {
         $window = Plugin::getInstance()->getSettings()->attemptWindow;
-        $this->bump($this->cacheKey($ip, $scopeKey), $window);
-        $this->bump($this->scopeCacheKey($scopeKey), $window);
+        $w = $this->windowNumber($window);
+        $this->bump($this->cacheKey($ip, $scopeKey, $w), $window);
+        $this->bump($this->scopeCacheKey($scopeKey, $w), $window);
     }
 
     /**
@@ -92,13 +102,19 @@ class Throttle extends Component
         }
     }
 
-    private function cacheKey(string $ip, string $scopeKey): string
+    /** The current fixed-window number; 0 if the window is somehow non-positive (settings enforce >= 30). */
+    private function windowNumber(int $window): int
     {
-        return "sesame:attempts:{$ip}:{$scopeKey}";
+        return $window > 0 ? intdiv(time(), $window) : 0;
     }
 
-    private function scopeCacheKey(string $scopeKey): string
+    private function cacheKey(string $ip, string $scopeKey, int $w): string
     {
-        return "sesame:attempts:scope:{$scopeKey}";
+        return "sesame:attempts:{$ip}:{$scopeKey}:{$w}";
+    }
+
+    private function scopeCacheKey(string $scopeKey, int $w): string
+    {
+        return "sesame:attempts:scope:{$scopeKey}:{$w}";
     }
 }
