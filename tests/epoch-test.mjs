@@ -5,12 +5,10 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
 
 const BASE = 'https://craft5-testbed.ddev.site';
 const TARGET = BASE + '/sesame-test/page-one';
 const TESTBED = process.env.HOME + '/sw/github-private/craft5-plugin-testbed';
-const SCRATCH = new URL('.', import.meta.url).pathname;
 const PASS1 = 'letmein';
 const PASS2 = 'newsecret';
 
@@ -68,13 +66,11 @@ async function unlock(jar, password) {
 }
 
 // Run a PHP snippet inside the testbed container (FQCN, no `use` — shell pre-imports clash).
-function craftShell(php, label) {
-  const file = SCRATCH + `_snip-${label}.php`;
-  writeFileSync(file, php);
-  const out = execFileSync('ddev', ['craft', 'shell'], {
+// The PHP is piped via stdin, so nothing is written to disk.
+function craftShell(php) {
+  return execFileSync('ddev', ['craft', 'shell'], {
     cwd: TESTBED, input: php, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
   });
-  return out;
 }
 const RESET = '\\Craft::$app->db->close(); \\Craft::$app->db->open();\n';
 function ruleEpoch() {
@@ -88,9 +84,10 @@ function changePassword(newPass) {
   const out = craftShell(RESET +
     "$p = \\iceboxind\\sesame\\Plugin::getInstance();\n" +
     "foreach ($p->rules->all() as $x) { if ($x->pattern === 'sesame-test/page-one') {\n" +
-    "  $enc = $p->secrets->store('" + newPass + "');\n" +
-    "  $x->secret = $enc['secret']; $x->secretMode = $enc['mode'];\n" +
-    "  $ok = $p->rules->save($x, true);\n" +
+    // Since P1.2 a rule's password is "code one"; changing it re-encodes that
+    // code AND bumps the rule epoch (Codes::changePassword -> Rules::revoke).
+    "  $one = $p->codes->codeOne($x->uid);\n" +
+    "  $ok = $one !== null && $p->codes->changePassword($one->uid, '" + newPass + "');\n" +
     "  echo 'SAVED=' . ($ok ? '1' : '0') . \"\\n\";\n" +
     "} }\n", 'setpass');
   return /SAVED=1/.test(out);

@@ -13,6 +13,9 @@ const post = async (u, f) => { const r = await fetch(u, { method: 'POST', redire
 const login = async () => { const t = await csrf(); await post(ACT('users/login'), { loginName: 'admin', password: (process.env.CRAFT_ADMIN_PW || 'Password123!'), CRAFT_CSRF_TOKEN: t }); };
 const save = async (f) => { const t = await csrf(); const r = await post(ACT('sesame/rules/' + f._a), Object.assign({ CRAFT_CSRF_TOKEN: t }, (delete f._a, f))); return r.json().catch(() => ({})); };
 const db = sql => execFileSync('ddev', ['mysql', '-N', '-e', sql], { cwd: TESTBED, encoding: 'utf8' }).trim();
+// A code's expiry as the CP displays it — the local (site-tz) calendar day.
+// The column stores end-of-day-local as UTC, so raw DATE() can be the next day.
+const localDate = cid => (execFileSync('ddev', ['craft', 'shell'], { cwd: TESTBED, input: `$c=\\iceboxind\\sesame\\Plugin::getInstance()->codes->getByUid('${cid}');echo 'D='.($c && $c->expiresAt ? \\craft\\helpers\\DateTimeHelper::toDateTime($c->expiresAt)->format('Y-m-d') : '')."\\n";`, encoding: 'utf8' }).match(/D=(\S*)/) || [])[1];
 const codeCount = () => parseInt(db(`SELECT COUNT(*) FROM sesame_rule_codes WHERE ruleUid='${RUID}';`) || '0', 10);
 const labelExists = l => db(`SELECT COUNT(*) FROM sesame_rule_codes WHERE ruleUid='${RUID}' AND label='${l}';`) === '1';
 
@@ -35,7 +38,7 @@ async function run() {
   // update-code (relabel + expiry)
   await save({ _a: 'update-code', uid: RUID, codeId: cid, label: 'District X (renamed)', expiresAt: '2032-02-02' });
   t('update-code relabels', labelExists('District X (renamed)'));
-  t('update-code sets expiry', db(`SELECT DATE(expiresAt) FROM sesame_rule_codes WHERE uid='${cid}';`) === '2032-02-02');
+  t('update-code sets expiry (local day)', localDate(cid) === '2032-02-02');
 
   // revoke-code (stamps revokedAt, keeps the row)
   await save({ _a: 'revoke-code', uid: RUID, codeId: cid });

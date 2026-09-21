@@ -22,11 +22,12 @@ $ck('unparseable protectFrom => FAIL CLOSED (active)', $mk('not-a-date', null)->
 
 // --- match() honors the schedule; anyEnabledRuleMatches() ignores it ---
 $entry = \craft\elements\Entry::find()->section('sesameTest')->slug('page-one')->one();
+$codesSvc = \iceboxind\sesame\Plugin::getInstance()->codes;
 // clear existing rules, make one protecting page-one, EXPIRED (protectUntil in the past)
 foreach ($rulesSvc->all() as $r) { $rulesSvc->delete($r->uid); }
-$enc = \iceboxind\sesame\Plugin::getInstance()->secrets->store('letmein');
-$expired = new \iceboxind\sesame\models\Rule(['label'=>'sched','matchType'=>'uri','pattern'=>'sesame-test/page-one','secret'=>$enc['secret'],'secretMode'=>$enc['mode'],'enabled'=>true,'protectUntil'=>$past]);
+$expired = new \iceboxind\sesame\models\Rule(['label'=>'sched','matchType'=>'uri','pattern'=>'sesame-test/page-one','enabled'=>true,'protectUntil'=>$past]);
 $rulesSvc->save($expired);
+$codesSvc->add($expired->uid, 'letmein', 'Default'); // code one = rule password (P1.2)
 $ck('EXPIRED rule: match() returns null (gate lets the page through)', $rulesSvc->match($entry) === null);
 $ck('EXPIRED rule: anyEnabledRuleMatches() true (cache veto ignores schedule)', $rulesSvc->anyEnabledRuleMatches($entry) === true);
 
@@ -38,6 +39,7 @@ $ck('ACTIVE rule: anyEnabledRuleMatches() still true', $rulesSvc->anyEnabledRule
 
 // cleanup -> restore a plain always-on rule for later HTTP tests
 foreach ($rulesSvc->all() as $r) { $rulesSvc->delete($r->uid); }
-$plain = new \iceboxind\sesame\models\Rule(['label'=>'Page One (test)','matchType'=>'uri','pattern'=>'sesame-test/page-one','secret'=>$enc['secret'],'secretMode'=>$enc['mode'],'enabled'=>true]);
+$plain = new \iceboxind\sesame\models\Rule(['label'=>'Page One (test)','matchType'=>'uri','pattern'=>'sesame-test/page-one','enabled'=>true]);
 $rulesSvc->save($plain);
+$codesSvc->add($plain->uid, 'letmein', 'Default');
 echo "\nRESULT: $pass passed, $fail failed\n";

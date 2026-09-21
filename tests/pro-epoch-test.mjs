@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 const BASE = 'https://craft5-testbed.ddev.site';
 const TARGET = BASE + '/sesame-test/page-one';
 const TESTBED = process.env.HOME + '/sw/github-private/craft5-plugin-testbed';
-const PASS = 'newsecret'; // current password after epoch-test.mjs left it here
+const PASS = 'letmein'; // the reseeded baseline password (tests/reseed.php)
 
 function parseSetCookies(res, jar) {
   const cookies = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
@@ -63,8 +63,11 @@ function ruleEpoch() {
   return parseInt(/EPOCH=(\d+)/.exec(out)[1], 10);
 }
 function mintLink() {
+  // Since P1.2 a magic link is minted PER CODE — signMagicLink takes code one's
+  // uid as its 4th arg, and actionLink refuses a token with no codeId.
   const out = craftShell(RESET + findRule +
-    "$tok = $p->gate->signMagicLink($rule->toScope(), 7*86400, 'sesame-test/page-one');\necho 'TOKEN=' . $tok . \"\\n\";\n");
+    "$one = $p->codes->codeOne($rule->uid);\n" +
+    "$tok = $p->gate->signMagicLink($rule->toScope(), 7*86400, 'sesame-test/page-one', $one->uid);\necho 'TOKEN=' . $tok . \"\\n\";\n");
   return /TOKEN=(.+)/.exec(out)[1].trim();
 }
 function revoke() {
