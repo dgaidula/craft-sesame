@@ -48,7 +48,13 @@ class Gate extends Component
 
     public function isUnlocked(Scope $scope): bool
     {
-        if (Craft::$app->getSession()->get($this->sessionKey($scope), false)) {
+        // The session value is a shape ({@see unlock()}), not a bare `true`, so
+        // it can carry the revocation epoch (and, later, a Pro code id). A
+        // stored epoch that no longer matches the live one — because the
+        // password changed or access was revoked — is treated as not unlocked,
+        // and any legacy bare `true` (never an array) fails closed too.
+        $stored = Craft::$app->getSession()->get($this->sessionKey($scope), null);
+        if (is_array($stored) && (int) ($stored['e'] ?? -1) === $scope->epoch) {
             return true;
         }
 
@@ -65,7 +71,11 @@ class Gate extends Component
      */
     public function unlock(Scope $scope, bool $remember = false): void
     {
-        Craft::$app->getSession()->set($this->sessionKey($scope), true);
+        // Store the epoch this unlock was granted under, not a bare `true`, so
+        // {@see isUnlocked()} can revoke it when the epoch is later bumped. An
+        // array (rather than the int alone) keeps room for a Pro code id (`c`)
+        // without another session-shape change later.
+        Craft::$app->getSession()->set($this->sessionKey($scope), ['e' => $scope->epoch]);
 
         if ($remember && $scope->rememberMe && Plugin::getInstance()->isPro()) {
             $duration = Plugin::getInstance()->getSettings()->rememberMeDuration;
@@ -91,6 +101,7 @@ class Gate extends Component
     {
         $value = Craft::$app->getSecurity()->hashData(Json::encode([
             'k' => $this->scopeKey($scope),
+            'ep' => $scope->epoch,
             'exp' => time() + $duration,
         ]));
 
@@ -121,6 +132,12 @@ class Gate extends Component
             return false;
         }
 
+        // A cookie minted under a superseded epoch is revoked, exactly like a
+        // stale session value.
+        if ((int) ($data['ep'] ?? -1) !== $scope->epoch) {
+            return false;
+        }
+
         return hash_equals($this->scopeKey($scope), (string) $data['k']);
     }
 
@@ -132,12 +149,13 @@ class Gate extends Component
 
     // --- PRO: shareable magic links ---
 
-    /** Signs a time-limited link token: scope type+uid (re-resolved live on click, never trusted from the token) + an optional redirect target + expiry. */
+    /** Signs a time-limited link token: scope type+uid (re-resolved live on click, never trusted from the token) + the epoch it was minted under + an optional redirect target + expiry. */
     public function signMagicLink(Scope $scope, int $ttl, string $target = ''): string
     {
         return Craft::$app->getSecurity()->hashData(Json::encode([
             'type' => $scope->type,
             'uid' => $scope->uid,
+            'ep' => $scope->epoch,
             'target' => $target,
             'exp' => time() + $ttl,
         ]));
@@ -147,9 +165,10 @@ class Gate extends Component
      * Validates + decodes a {@see signMagicLink()} token. Checks signature
      * and expiry only — the caller (`GateController::actionLink`) is still
      * responsible for re-resolving the scope live and confirming it still
-     * matches an enabled rule before unlocking anything.
+     * matches an enabled rule (and that the epoch still matches) before
+     * unlocking anything.
      *
-     * @return array{type:string,uid:string,target:string}|null
+     * @return array{type:string,uid:string,epoch:int,target:string}|null
      */
     public function readMagicLink(string $token): ?array
     {
@@ -166,6 +185,7 @@ class Gate extends Component
         return [
             'type' => (string) $data['type'],
             'uid' => (string) $data['uid'],
+            'epoch' => (int) ($data['ep'] ?? -1),
             'target' => (string) ($data['target'] ?? ''),
         ];
     }
@@ -224,7 +244,10 @@ class Gate extends Component
     private function entryScope(string $elementUid): ?Scope
     {
         $stored = Plugin::getInstance()->secrets->getForEntry($elementUid);
-        if ($stored === null) {
+        // null = never protected; 'disabled' = a tombstone kept only to hold the
+        // revocation epoch across a disable→re-enable cycle ({@see \iceboxind\sesame\services\Secrets::disableForEntry()}).
+        // Either way the entry is not protected by its own field right now.
+        if ($stored === null || $stored['mode'] === 'disabled') {
             return null;
         }
 
@@ -235,6 +258,7 @@ class Gate extends Component
             'templateOverride' => null,
             'secret' => $stored['secret'],
             'secretMode' => $stored['mode'],
+            'epoch' => $stored['epoch'],
         ]);
     }
 

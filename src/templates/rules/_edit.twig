@@ -103,6 +103,17 @@
         {% else %}
             <p class="light">{{ '•••• set — this password is bcrypt-hashed and can’t be displayed. Enter a new one to replace it.'|t('sesame') }}</p>
         {% endif %}
+
+        <div class="field">
+            <div class="heading">
+                <label>{{ 'Revoke access'|t('sesame') }}</label>
+                <div class="instructions">
+                    <p>{{ 'Immediately signs out everyone currently unlocked and kills every shareable link for this rule. The password stays the same — visitors just have to enter it again.'|t('sesame') }}</p>
+                </div>
+            </div>
+            <button type="button" class="btn" id="sesame-revoke-btn" data-uid="{{ rule.uid }}">{{ 'Revoke all access now'|t('sesame') }}</button>
+            <p id="sesame-revoke-result" class="light" style="margin-top:6px;"></p>
+        </div>
     {% endif %}
 
     <hr>
@@ -246,6 +257,38 @@ document.addEventListener('click', function (e) {
         })
         .catch(function () {
             result.textContent = {{ 'Couldn’t mint a link.'|t('sesame')|json_encode|raw }};
+        });
+});
+
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('#sesame-revoke-btn');
+    if (!btn) {
+        return;
+    }
+    e.preventDefault();
+    if (!window.confirm({{ 'Sign out everyone and kill every shareable link for this rule? The password is unchanged.'|t('sesame')|json_encode|raw }})) {
+        return;
+    }
+    var result = document.getElementById('sesame-revoke-result');
+    result.textContent = {{ 'Revoking…'|t('sesame')|json_encode|raw }};
+
+    var body = new FormData();
+    body.append('uid', btn.dataset.uid);
+    body.append({{ craft.app.config.general.csrfTokenName|json_encode|raw }}, {{ craft.app.request.csrfToken|json_encode|raw }});
+
+    fetch({{ actionUrl('sesame/rules/revoke')|json_encode|raw }}, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: body,
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            result.textContent = data.ok
+                ? {{ 'All access revoked. Everyone must re-enter the password.'|t('sesame')|json_encode|raw }}
+                : (data.error || {{ 'Couldn’t revoke access.'|t('sesame')|json_encode|raw }});
+        })
+        .catch(function () {
+            result.textContent = {{ 'Couldn’t revoke access.'|t('sesame')|json_encode|raw }};
         });
 });
 {% endjs %}

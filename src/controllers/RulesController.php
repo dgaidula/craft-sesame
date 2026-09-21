@@ -84,7 +84,13 @@ class RulesController extends Controller
             $rule->addError('secret', Craft::t('sesame', 'A password is required.'));
         }
 
-        if ($rule->hasErrors() || !Plugin::getInstance()->rules->save($rule)) {
+        // Changing an existing rule's password revokes every outstanding unlock
+        // (session, remember-me cookie, magic link) via an epoch bump. A new
+        // rule starts fresh, and a save that leaves the password blank doesn't
+        // touch the credential, so neither bumps.
+        $bumpEpoch = !$isNew && $password !== '';
+
+        if ($rule->hasErrors() || !Plugin::getInstance()->rules->save($rule, $bumpEpoch)) {
             Craft::$app->getSession()->setError(Craft::t('sesame', 'Couldn’t save the rule.'));
             return $this->renderEdit($rule);
         }
@@ -123,6 +129,26 @@ class RulesController extends Controller
         }
 
         return $this->redirectToPostedUrl();
+    }
+
+    /**
+     * "Revoke all access" for one rule (both editions): bumps the rule's
+     * revocation epoch so every outstanding session, remember-me cookie, and
+     * magic link is cut off at once — the password itself is unchanged, so the
+     * next visitor just re-enters it. POST + JSON, permission-gated by
+     * `beforeAction()` like every other action here.
+     */
+    public function actionRevoke(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        $uid = (string) Craft::$app->getRequest()->getRequiredBodyParam('uid');
+        if (!Plugin::getInstance()->rules->revoke($uid)) {
+            throw new NotFoundHttpException(Craft::t('sesame', 'Rule not found.'));
+        }
+
+        return $this->asJson(['ok' => true]);
     }
 
     /**

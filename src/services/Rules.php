@@ -12,6 +12,7 @@ use iceboxind\sesame\migrations\Install;
 use iceboxind\sesame\models\Rule;
 use iceboxind\sesame\models\Scope;
 use iceboxind\sesame\Plugin;
+use yii\db\Expression;
 
 /**
  * Reads/writes {{%sesame_rules}} and matches the current entry against them.
@@ -51,8 +52,20 @@ class Rules extends Component
         return $this->all()[$uid] ?? null;
     }
 
-    /** Insert or update, keyed by `$rule->id` (insert when null). Assigns id/uid back onto the model. */
-    public function save(Rule $rule): bool
+    /**
+     * Insert or update, keyed by `$rule->id` (insert when null). Assigns id/uid
+     * back onto the model.
+     *
+     * @param bool $bumpEpoch Increments the revocation epoch atomically as part
+     * of the same UPDATE (`epoch = epoch + 1`), cutting off every outstanding
+     * session / remember-me cookie / magic link. Pass true only when the
+     * credential actually changed (a new password) — never for a plain
+     * enable/disable, reorder, or label edit. Ignored on insert (a brand-new
+     * rule starts at epoch 0 with nobody holding an unlock). The `epoch` column
+     * is otherwise left untouched, so the model never writes back a stale
+     * absolute value over a concurrent bump.
+     */
+    public function save(Rule $rule, bool $bumpEpoch = false): bool
     {
         if (!$rule->validate()) {
             return false;
@@ -78,6 +91,9 @@ class Rules extends Component
         ];
 
         if ($rule->id) {
+            if ($bumpEpoch) {
+                $data['epoch'] = new Expression('[[epoch]] + 1');
+            }
             $db->createCommand()->update(Install::RULES_TABLE, $data, ['id' => $rule->id])->execute();
         } else {
             $data['uid'] = $rule->uid ?: StringHelper::UUID();
@@ -89,6 +105,27 @@ class Rules extends Component
 
         $this->rules = null;
         $this->purgeStaticCache();
+        return true;
+    }
+
+    /**
+     * Explicit "revoke all access": bumps the rule's epoch atomically without
+     * changing the password, so everyone currently unlocked (session,
+     * remember-me cookie, or outstanding magic link) is cut off and must
+     * re-enter the same password. Both editions — revocation is a security
+     * property, not a Pro convenience.
+     */
+    public function revoke(string $uid): bool
+    {
+        $rule = $this->getByUid($uid);
+        if (!$rule || !$rule->id) {
+            return false;
+        }
+
+        Craft::$app->getDb()->createCommand()
+            ->update(Install::RULES_TABLE, ['epoch' => new Expression('[[epoch]] + 1')], ['id' => $rule->id])
+            ->execute();
+        $this->rules = null;
         return true;
     }
 
@@ -237,6 +274,7 @@ class Rules extends Component
             'secretMode' => (string) $row['secretMode'],
             'message' => $row['message'],
             'templateOverride' => $row['templateOverride'],
+            'epoch' => (int) ($row['epoch'] ?? 0),
             'codesJson' => $row['codesJson'],
             'unlockUntil' => $row['unlockUntil'],
             'rememberMe' => (bool) $row['rememberMe'],

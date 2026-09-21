@@ -72,6 +72,13 @@ class GateController extends Controller
             throw new NotFoundHttpException(Craft::t('sesame', 'This link has expired or is no longer valid.'));
         }
 
+        // Revocation: a link minted under a superseded epoch (the rule's
+        // password changed, or access was revoked, since the mint) is dead —
+        // even though the rule still exists and is enabled.
+        if ($data['epoch'] !== $scope->epoch) {
+            throw new NotFoundHttpException(Craft::t('sesame', 'This link has expired or is no longer valid.'));
+        }
+
         $gate->unlock($scope);
         Plugin::getInstance()->accessLog->record('unlock', $scope, Craft::$app->getRequest());
 

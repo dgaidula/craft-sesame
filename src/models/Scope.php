@@ -37,6 +37,15 @@ class Scope extends Model
     /** @var 'encrypt'|'hash' */
     public string $secretMode = 'encrypt';
 
+    /**
+     * Revocation epoch (both editions). The current, live value from the
+     * backing rule / entry-secret row. An unlock stores this into the session
+     * (and into any remember-me cookie / magic link); {@see \iceboxind\sesame\services\Gate::isUnlocked()}
+     * re-reads the live value and compares, so a bumped epoch (password change
+     * or explicit revoke) instantly invalidates every outstanding unlock.
+     */
+    public int $epoch = 0;
+
     /** PRO. Whether this scope's rule opted into remember-me. Always false for a per-entry (Protect field) scope — that opt-in doesn't exist there yet. */
     public bool $rememberMe = false;
 }

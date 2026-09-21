@@ -113,17 +113,23 @@ marked stub — `isPro()` boundary + `// TODO Pro:` comment, no behavior yet).
   it — no password prompt. Good for emailing a district or a partner a
   single link instead of a shared password. The link is a signed, expiring
   token (7 days by default); clicking it still re-resolves the rule live, so
-  **disabling or deleting the rule invalidates every link minted from it
-  immediately.** A rule matched by an exact URI (no `*` glob) links straight
+  **disabling or deleting the rule, changing its password, or revoking access
+  invalidates every link minted from it immediately** (see revocation below).
+  A rule matched by an exact URI (no `*` glob) links straight
   to that page; a section/entry-type or globbed rule unlocks everything it
   covers and lands on the site root.
 
-  > Note on revocation: a magic link, an already-unlocked session, and a
-  > remember-me cookie do **not** re-check the password — they unlock the
-  > *scope*. So **changing a rule's password does not lock out** people who
-  > already hold a link, an unlocked session, or a remember-me cookie. To cut
-  > everyone off at once, disable or delete the rule, or rotate the site's
-  > `securityKey` (which also invalidates every other signed Sesame token).
+  > Note on revocation: every unlock — a magic link, an already-unlocked
+  > session, or a remember-me cookie — carries a *revocation epoch*. **Changing
+  > a rule's password bumps that epoch, which instantly locks out everyone
+  > already holding a link, a session, or a remember-me cookie**; they must
+  > re-enter the new password. To cut everyone off *without* changing the
+  > password, use **Revoke all access now** on the rule's edit screen (it bumps
+  > the epoch on its own). Disabling or deleting the rule still works too.
+  > (Rotating the site's `securityKey` remains the blunt instrument that also
+  > invalidates every other signed Sesame token.) The same epoch applies to
+  > per-entry (Protect field) passwords: changing or clearing one locks out
+  > anyone who unlocked with the old one.
 - **Access log.** Every unlock, failed password, and throttle event on a
   protected page is recorded — event, the rule or entry involved, IP,
   user agent, when — visible at **Sesame → Access Log** (its own
@@ -135,11 +141,12 @@ marked stub — `isPro()` boundary + `// TODO Pro:` comment, no behavior yet).
   **Settings → General → Remember-me duration** to something other than 0,
   and the password screen for that rule offers visitors a "Remember me on
   this device" checkbox. Checking it sets a signed cookie
-  (`httpOnly`, `secure`, `sameSite=Lax`) carrying the scope key and an
-  expiry — no server-side session table to manage, but also not
-  individually revocable; the escape hatch for invalidating every
-  outstanding remember-me cookie (and every other signed Sesame token) at
-  once is rotating the site's `securityKey`.
+  (`httpOnly`, `secure`, `sameSite=Lax`) carrying the scope key, the
+  revocation epoch, and an expiry — no server-side session table to manage.
+  It is not *individually* revocable, but a password change or **Revoke all
+  access now** bumps the epoch and invalidates it along with every other
+  outstanding unlock for that rule; rotating the site's `securityKey` remains
+  the escape hatch that kills every signed Sesame token at once.
 
 ## Template usage / overriding the password screen
 

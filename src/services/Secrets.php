@@ -9,6 +9,7 @@ use craft\helpers\Db;
 use craft\helpers\StringHelper;
 use iceboxind\sesame\migrations\Install;
 use iceboxind\sesame\Plugin;
+use yii\db\Expression;
 
 /**
  * Owns every secret Sesame stores: the generic encode/verify/reveal contract
@@ -83,21 +84,30 @@ class Secrets extends Component
 
     // --- Per-entry secrets ({{%sesame_entry_secrets}}), keyed by element uid ---
 
-    /** @return array{secret:string,mode:string}|null */
+    /** @return array{secret:string,mode:string,epoch:int}|null */
     public function getForEntry(string $elementUid): ?array
     {
         $row = (new Query())
-            ->select(['secret', 'secretMode'])
+            ->select(['secret', 'secretMode', 'epoch'])
             ->from(Install::ENTRY_SECRETS_TABLE)
             ->where(['elementUid' => $elementUid])
             ->one();
 
-        return $row ? ['secret' => (string) $row['secret'], 'mode' => (string) $row['secretMode']] : null;
+        return $row ? [
+            'secret' => (string) $row['secret'],
+            'mode' => (string) $row['secretMode'],
+            'epoch' => (int) ($row['epoch'] ?? 0),
+        ] : null;
     }
 
     public function hasEntrySecret(string $elementUid): bool
     {
-        return $this->getForEntry($elementUid) !== null;
+        $row = $this->getForEntry($elementUid);
+        // A 'disabled' tombstone ({@see disableForEntry()}) carries the
+        // revocation epoch but no usable secret — treat it as "no secret" so a
+        // re-enable without a fresh password fails closed, exactly as it did
+        // when disable hard-deleted the row.
+        return $row !== null && $row['mode'] !== 'disabled';
     }
 
     /** Encodes (per `settings.hashPasswords`) and upserts the password for one entry. */
@@ -114,9 +124,14 @@ class Secrets extends Component
             ->scalar();
 
         if ($existingId) {
+            // Replacing an existing per-entry password is a credential change:
+            // bump the epoch atomically so anyone holding an old unlock is cut
+            // off (same contract as Rules::save() with $bumpEpoch). A brand-new
+            // row starts at epoch 0 — nobody holds an unlock for it yet.
             $db->createCommand()->update(Install::ENTRY_SECRETS_TABLE, [
                 'secret' => $encoded['secret'],
                 'secretMode' => $encoded['mode'],
+                'epoch' => new Expression('[[epoch]] + 1'),
                 'dateUpdated' => $now,
             ], ['id' => $existingId])->execute();
         } else {
@@ -131,11 +146,48 @@ class Secrets extends Component
         }
     }
 
+    /**
+     * Hard-deletes the per-entry secret row. Used only when the entry ITSELF is
+     * deleted ({@see \iceboxind\sesame\fields\Protect::afterElementDelete()}) —
+     * turning protection off without deleting the entry goes through
+     * {@see disableForEntry()} instead, which preserves the revocation epoch.
+     */
     public function clearForEntry(string $elementUid): void
     {
         Craft::$app->getDb()->createCommand()
             ->delete(Install::ENTRY_SECRETS_TABLE, ['elementUid' => $elementUid])
             ->execute();
+    }
+
+    /**
+     * Protection was switched OFF for an entry that still exists. We do NOT
+     * hard-delete the row: the session key is the entry's (stable) element uid,
+     * so a hard delete would reset the epoch to 0 on a later re-enable and let
+     * an in-session unlock survive a password change made across a
+     * disable→re-enable cycle. Instead keep the row as a tombstone — blank the
+     * secret (so the old password is gone and a re-enable must set a new one),
+     * mark it 'disabled' so {@see \iceboxind\sesame\services\Gate::isProtected()}
+     * treats the entry as unprotected, and bump the epoch so the counter stays
+     * monotonic. No-op when the entry was never protected (nothing to revoke).
+     */
+    public function disableForEntry(string $elementUid): void
+    {
+        $existingId = (new Query())
+            ->select(['id'])
+            ->from(Install::ENTRY_SECRETS_TABLE)
+            ->where(['elementUid' => $elementUid])
+            ->scalar();
+
+        if (!$existingId) {
+            return;
+        }
+
+        Craft::$app->getDb()->createCommand()->update(Install::ENTRY_SECRETS_TABLE, [
+            'secret' => '',
+            'secretMode' => 'disabled',
+            'epoch' => new Expression('[[epoch]] + 1'),
+            'dateUpdated' => Db::prepareDateForDb(new \DateTime()),
+        ], ['id' => $existingId])->execute();
     }
 
     /**
@@ -157,9 +209,14 @@ class Secrets extends Component
             ->scalar();
 
         if ($existingId) {
+            // Clearing a real password (protection kept on, password removed) is
+            // a revocation: bump the epoch so anyone who unlocked with the old
+            // password is cut off, not left holding a live session against a
+            // now-empty (fail-closed) secret.
             $db->createCommand()->update(Install::ENTRY_SECRETS_TABLE, [
                 'secret' => '',
                 'secretMode' => 'encrypt',
+                'epoch' => new Expression('[[epoch]] + 1'),
                 'dateUpdated' => $now,
             ], ['id' => $existingId])->execute();
         } else {

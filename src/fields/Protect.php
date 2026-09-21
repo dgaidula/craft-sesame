@@ -80,7 +80,10 @@ class Protect extends Field
             $secrets = Plugin::getInstance()->secrets;
 
             if (!$value->enabled) {
-                $secrets->clearForEntry($uid);
+                // Keep the epoch alive across a later re-enable — see
+                // Secrets::disableForEntry(). NOT a hard delete (that happens
+                // only when the entry itself is deleted, below).
+                $secrets->disableForEntry($uid);
             } elseif ($value->password !== null) {
                 $secrets->storeForEntry($uid, $value->password);
             } elseif (!$secrets->hasEntrySecret($uid)) {

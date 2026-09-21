@@ -38,6 +38,15 @@ class Rule extends Model
     public ?string $message = null;
     public ?string $templateOverride = null;
 
+    /**
+     * Revocation epoch (both editions). Read from the row for {@see toScope()};
+     * never written through this model — {@see \iceboxind\sesame\services\Rules::save()}
+     * leaves the column untouched on a normal save and bumps it with an atomic
+     * `epoch = epoch + 1` when the password changes, so a concurrent bump can't
+     * be clobbered by writing back a stale absolute value.
+     */
+    public int $epoch = 0;
+
     // --- Pro columns: present in schema, Lite ignores them. ---
 
     /** PRO. Multiple named codes (JSON). TODO Pro: not yet read anywhere. */
@@ -56,7 +65,7 @@ class Rule extends Model
             [['matchType'], 'in', 'range' => ['uri', 'section', 'entryType']],
             [['secretMode'], 'in', 'range' => ['encrypt', 'hash']],
             [['enabled', 'rememberMe'], 'boolean'],
-            [['sortOrder'], 'integer'],
+            [['sortOrder', 'epoch'], 'integer'],
             [['label', 'pattern', 'templateOverride'], 'string', 'max' => 255],
             [['message', 'secret', 'codesJson'], 'string'],
             [['unlockUntil'], 'safe'],
@@ -73,6 +82,7 @@ class Rule extends Model
             'templateOverride' => $this->templateOverride,
             'secret' => $this->secret,
             'secretMode' => $this->secretMode,
+            'epoch' => $this->epoch,
             'rememberMe' => $this->rememberMe,
         ]);
     }

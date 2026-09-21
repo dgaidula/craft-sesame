@@ -38,6 +38,13 @@ class Install extends Migration
                 'secretMode' => $this->string(10)->notNull()->defaultValue('encrypt'), // encrypt | hash
                 'message' => $this->text(),
                 'templateOverride' => $this->string(),
+                // Revocation epoch (both editions): bumped whenever this rule's
+                // password changes or an admin revokes access. A session /
+                // remember-me cookie / magic link carries the epoch it was
+                // minted under; the gate compares it against this live value, so
+                // a password change instantly cuts off everyone holding an old
+                // one. See services/Gate.php.
+                'epoch' => $this->integer()->notNull()->defaultValue(0),
                 // Pro columns — present in schema, Lite never reads/writes them.
                 'codesJson' => $this->text(),
                 'unlockUntil' => $this->dateTime(),
@@ -72,6 +79,10 @@ class Install extends Migration
                 'elementUid' => $this->uid()->notNull(),
                 'secret' => $this->text()->notNull(),
                 'secretMode' => $this->string(10)->notNull()->defaultValue('encrypt'), // encrypt | hash
+                // Revocation epoch (both editions) — same contract as the rules
+                // table above: bumped on password change / clear, compared live
+                // by the gate so a per-entry password change locks people out.
+                'epoch' => $this->integer()->notNull()->defaultValue(0),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
                 'uid' => $this->uid(),
