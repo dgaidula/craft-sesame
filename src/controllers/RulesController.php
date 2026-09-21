@@ -102,8 +102,7 @@ class RulesController extends Controller
             // override is preserved through the hydrated model.
             $rule->brandHeading = trim((string) $request->getBodyParam('brandHeading', '')) ?: null;
             $rule->brandAccent = Branding::sanitizeAccent($request->getBodyParam('brandAccent'));
-            $logoIds = $request->getBodyParam('brandLogoId');
-            $rule->brandLogoId = is_array($logoIds) ? ((int) ($logoIds[0] ?? 0) ?: null) : null;
+            $rule->brandLogoId = Branding::validImageAssetId($request->getBodyParam('brandLogoId'));
         }
 
         // The single Password field is the rule's "code one" (see the Codes

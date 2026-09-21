@@ -81,6 +81,23 @@ class Branding extends Component
         return $value;
     }
 
+    /**
+     * Validates a posted logo id (from an elementSelectField, which posts an
+     * array) to the id of a real IMAGE asset, or null. Guards two 500s: a
+     * non-element or deleted id would violate the `logoId` foreign key on save,
+     * and a non-image asset (a PDF, a video) would render as a broken `<img>` on
+     * the challenge screen.
+     */
+    public static function validImageAssetId(mixed $posted): ?int
+    {
+        $id = is_array($posted) ? (int) ($posted[0] ?? 0) : (int) $posted;
+        if ($id <= 0) {
+            return null;
+        }
+        $asset = Craft::$app->getAssets()->getAssetById($id);
+        return ($asset !== null && $asset->kind === 'image') ? $id : null;
+    }
+
     /** Parses a sanitized hex / rgb() / hsl() colour to `[r, g, b]` (0–255), or null. Alpha is ignored. */
     private static function colorToRgb(string $value): ?array
     {
@@ -204,6 +221,11 @@ class Branding extends Component
     {
         $db = Craft::$app->getDb();
         $now = Db::prepareDateForDb(new \DateTime());
+        // `heading` is a string(255) column; this write has no model validation
+        // behind it (unlike a rule), so cap it rather than let a pasted essay
+        // throw on strict MySQL/Postgres. `intro` is TEXT and `accent` is already
+        // sanitized/capped by sanitizeAccent().
+        $heading = $heading !== null ? mb_substr($heading, 0, 255) : null;
         $data = [
             'logoId' => $logoId ?: null,
             'heading' => $heading ?: null,

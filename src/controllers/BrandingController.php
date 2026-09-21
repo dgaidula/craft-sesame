@@ -49,8 +49,7 @@ class BrandingController extends Controller
         $this->requirePostRequest();
         $request = Craft::$app->getRequest();
 
-        $logoIds = $request->getBodyParam('logoId');
-        $logoId = is_array($logoIds) ? ((int) ($logoIds[0] ?? 0) ?: null) : null;
+        $logoId = Branding::validImageAssetId($request->getBodyParam('logoId'));
 
         Plugin::getInstance()->branding->saveSiteDefaults(
             $logoId,
