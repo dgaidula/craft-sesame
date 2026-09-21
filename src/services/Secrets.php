@@ -35,7 +35,10 @@ class Secrets extends Component
             return ['secret' => $security->hashPassword($raw), 'mode' => 'hash'];
         }
 
-        return ['secret' => $security->encryptByKey($raw), 'mode' => 'encrypt'];
+        // encryptByKey() returns raw binary; base64 it so it stores cleanly in
+        // the utf8 `secret` text column (raw binary throws an "Incorrect string
+        // value" on insert). reveal() base64-decodes before decrypting.
+        return ['secret' => base64_encode($security->encryptByKey($raw)), 'mode' => 'encrypt'];
     }
 
     public function verify(string $raw, string $stored, string $mode): bool
@@ -64,7 +67,17 @@ class Secrets extends Component
             return null;
         }
 
-        $decrypted = Craft::$app->getSecurity()->decryptByKey($stored);
+        $raw = base64_decode($stored, true);
+        if ($raw === false) {
+            return null;
+        }
+
+        try {
+            $decrypted = Craft::$app->getSecurity()->decryptByKey($raw);
+        } catch (\Throwable) {
+            return null;
+        }
+
         return $decrypted === false ? null : $decrypted;
     }
 
