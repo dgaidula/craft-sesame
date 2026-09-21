@@ -23,6 +23,7 @@ use craft\web\View;
 use iceboxind\sesame\fields\Protect;
 use iceboxind\sesame\models\Settings;
 use iceboxind\sesame\services\AccessLog;
+use iceboxind\sesame\services\Branding;
 use iceboxind\sesame\services\Codes;
 use iceboxind\sesame\services\Gate;
 use iceboxind\sesame\services\Rules;
@@ -47,6 +48,7 @@ use yii\base\Event;
  * @property-read Gate $gate
  * @property-read Throttle $throttle
  * @property-read AccessLog $accessLog
+ * @property-read Branding $branding
  * @property-read StaticCache $staticCache
  * @property-read Settings $settings
  */
@@ -86,6 +88,7 @@ class Plugin extends BasePlugin
                 'gate' => Gate::class,
                 'throttle' => Throttle::class,
                 'accessLog' => AccessLog::class,
+                'branding' => Branding::class,
                 'staticCache' => StaticCache::class,
             ],
         ];
@@ -133,15 +136,16 @@ class Plugin extends BasePlugin
             'rules' => ['label' => Craft::t('sesame', 'Rules'), 'url' => 'sesame/rules'],
         ];
 
-        // PRO. Lite hides the nav item entirely — LogController also refuses
-        // directly (belt-and-suspenders), but there's no reason to advertise
-        // a screen Lite can't use. Permission-gated on top of the edition
-        // check, same as any other CP nav entry.
-        if (
-            $this->isPro()
-            && Craft::$app->getUser()->checkPermission(self::PERMISSION_VIEW_LOG)
-        ) {
-            $item['subnav']['log'] = ['label' => Craft::t('sesame', 'Access Log'), 'url' => 'sesame/log'];
+        // PRO. Lite hides these entirely — the controllers also refuse directly
+        // (belt-and-suspenders), but there's no reason to advertise screens Lite
+        // can't use. Both are permission-gated on top of the edition check.
+        if ($this->isPro()) {
+            if (Craft::$app->getUser()->checkPermission(self::PERMISSION_MANAGE_RULES)) {
+                $item['subnav']['branding'] = ['label' => Craft::t('sesame', 'Branding'), 'url' => 'sesame/branding'];
+            }
+            if (Craft::$app->getUser()->checkPermission(self::PERMISSION_VIEW_LOG)) {
+                $item['subnav']['log'] = ['label' => Craft::t('sesame', 'Access Log'), 'url' => 'sesame/log'];
+            }
         }
 
         return $item;
@@ -261,6 +265,7 @@ class Plugin extends BasePlugin
                 $event->rules['sesame/rules/new'] = 'sesame/rules/edit';
                 $event->rules['sesame/rules/<uid:[a-zA-Z0-9\-]+>'] = 'sesame/rules/edit';
                 $event->rules['sesame/log'] = 'sesame/log/index';
+                $event->rules['sesame/branding'] = 'sesame/branding/index';
             }
         );
     }

@@ -180,6 +180,17 @@ by element ID, since IDs aren't portable across environments. Written by
 Pro's per-unlock audit trail. Schema created by `Install` now; Lite never
 writes to it.
 
+### `{{%sesame_branding}}`
+
+PRO (P1.3). A single row holding the site-default challenge-screen branding
+(`logoId`, `heading`, `intro`, `accent`), read/written by the `Branding` service
+and the `Sesame → Branding` CP screen — a table, not project config, so it's
+editable on production. Per-rule overrides are the `brand*` columns on
+`{{%sesame_rules}}` (intro override = the rule's `message`). `Branding::resolveForScope()`
+merges per-rule ?? site ?? built-in for the challenge template, and
+`Branding::sanitizeAccent()` keeps the accent a safe CSS colour (it's injected
+into a `<style>` block).
+
 ## The gate spine
 
 Registered in `Plugin::registerRequestGate()`, on `craft\base\Element::EVENT_SET_ROUTE`,

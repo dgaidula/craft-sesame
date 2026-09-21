@@ -9,6 +9,7 @@ use craft\helpers\UrlHelper;
 use craft\web\Controller;
 use iceboxind\sesame\models\Rule;
 use iceboxind\sesame\Plugin;
+use iceboxind\sesame\services\Branding;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
@@ -95,6 +96,14 @@ class RulesController extends Controller
                 // An empty window would mean the rule never protects.
                 $rule->addError('protectUntil', Craft::t('sesame', 'The unlock time must be after the lock time.'));
             }
+
+            // PRO. Per-rule challenge-screen branding overrides (P1.3). Read only
+            // on Pro; on Lite the fields aren't rendered so a grandfathered
+            // override is preserved through the hydrated model.
+            $rule->brandHeading = trim((string) $request->getBodyParam('brandHeading', '')) ?: null;
+            $rule->brandAccent = Branding::sanitizeAccent($request->getBodyParam('brandAccent'));
+            $logoIds = $request->getBodyParam('brandLogoId');
+            $rule->brandLogoId = is_array($logoIds) ? ((int) ($logoIds[0] ?? 0) ?: null) : null;
         }
 
         // The single Password field is the rule's "code one" (see the Codes
@@ -443,6 +452,8 @@ class RulesController extends Controller
             'codeOneMode' => $codeOne?->secretMode,
             // Codes 2..N for the Pro code-management list (empty on Lite / new).
             'additionalCodes' => $additionalCodes,
+            // The rule's branding logo asset (for the Pro elementSelectField), or null.
+            'brandLogo' => $rule->brandLogoId ? Craft::$app->getAssets()->getAssetById($rule->brandLogoId) : null,
         ]);
     }
 }

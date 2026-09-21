@@ -60,9 +60,9 @@ the people who need to get in without a password.
 | Remember me — unlocks that survive a browser restart, per rule | — | ✅ |
 | Scheduled lock and unlock, by date — protect only within a time window | — | ✅ |
 | Multiple named codes per rule, each with a label, an expiry, and a revoke | — | ✅ |
-| Control-panel branding of the password screen | — | roadmap |
+| Control-panel branding of the password screen — logo, heading, intro, accent | — | ✅ |
 
-The roadmap row is the next Pro feature. A pattern
+A pattern
 rule created on Pro keeps protecting its pages if the site later moves to
 Lite; only creating one, or changing what it matches, needs Pro — its
 password, its on/off switch, and deleting it stay editable on Lite.
@@ -173,6 +173,13 @@ Pro adds the tools for running access, not just setting it.
   anyone else or changing the shared password; changing the primary password
   still locks everyone out. Up to 25 codes per rule. Lite has one code — the
   Password field.
+- **Branding the password screen.** At **Sesame → Branding**, set a site-wide
+  logo, heading, intro copy, and accent colour for the default screen; any rule
+  can override each of them on its own edit screen (its Custom message is the
+  per-rule intro). Stored in the plugin’s own table, so it stays editable on
+  production with `allowAdminChanges` off. It restyles the *built-in* screen —
+  a full template override (below) still trumps it — and the accent is
+  validated to a safe CSS colour. Set nothing and you get Sesame’s default look.
 
 ## Template usage / overriding the password screen
 
@@ -193,8 +200,10 @@ Either way, keep the form’s contract intact: `method="post"`, its
 `return`, `redirectInput(return)`, and a
 `type="password" name="password" id="sesame-password"` input. The template
 receives `message`, `token`, `return`, `error` (string or null),
-`cooldown` (bool), and `showRememberMe` (bool — Pro only; true when the
-matched rule opted into remember-me). If your override wants to offer
+`cooldown` (bool), `showRememberMe` (bool — Pro only; true when the
+matched rule opted into remember-me), and the resolved branding
+`brandHeading` / `brandAccent` / `brandLogoUrl` (each a string or null; a
+custom template may use or ignore them). If your override wants to offer
 remember-me too, add a `name="remember" value="1"` checkbox inside the form
 when `showRememberMe` is true — `GateController::actionUnlock()` reads it
 regardless of which template rendered the form.

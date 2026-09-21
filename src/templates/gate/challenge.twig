@@ -42,6 +42,16 @@
             }
         }
 
+        {# PRO branding: a custom accent overrides both themes (last :root wins);
+           the focus ring is derived from it with color-mix. brandAccent is
+           sanitized to a safe CSS colour on save. #}
+        {% if brandAccent is defined and brandAccent %}
+        :root {
+            --sesame-accent: {{ brandAccent }};
+            --sesame-accent-ring: color-mix(in srgb, {{ brandAccent }} 28%, transparent);
+        }
+        {% endif %}
+
         * {
             box-sizing: border-box;
         }
@@ -80,6 +90,13 @@
             height: 28px;
             margin: 0 auto 20px;
             color: var(--sesame-muted);
+        }
+
+        .sesame-logo {
+            display: block;
+            max-width: 180px;
+            max-height: 64px;
+            margin: 0 auto 20px;
         }
 
         .sesame-site {
@@ -192,12 +209,16 @@
 </head>
 <body>
     <div class="sesame-card">
-        <svg class="sesame-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="4.5" y="10.5" width="15" height="10" rx="2"></rect>
-            <path d="M7.5 10.5V7.5a4.5 4.5 0 0 1 9 0v3"></path>
-        </svg>
+        {% if brandLogoUrl is defined and brandLogoUrl %}
+            <img class="sesame-logo" src="{{ brandLogoUrl }}" alt="">
+        {% else %}
+            <svg class="sesame-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="4.5" y="10.5" width="15" height="10" rx="2"></rect>
+                <path d="M7.5 10.5V7.5a4.5 4.5 0 0 1 9 0v3"></path>
+            </svg>
+        {% endif %}
 
-        <p class="sesame-site">{{ craft.app.sites.currentSite.name }}</p>
+        <p class="sesame-site">{{ (brandHeading is defined and brandHeading) ? brandHeading : craft.app.sites.currentSite.name }}</p>
         <p class="sesame-message">{{ message }}</p>
 
         <form class="sesame-form" method="post" action="{{ actionUrl('sesame/gate/unlock') }}">

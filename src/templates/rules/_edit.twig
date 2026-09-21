@@ -212,6 +212,45 @@
             on: rule.rememberMe,
         }) }}
 
+        <hr>
+
+        <div class="field">
+            <div class="heading">
+                <label>{{ 'Password-screen branding'|t('sesame') }} <sup>PRO</sup></label>
+                <div class="instructions">
+                    <p>{{ 'Override the site-wide defaults (Sesame → Branding) for this rule’s password screen. Leave a field blank to inherit. The per-rule intro is the Custom message above.'|t('sesame') }}</p>
+                </div>
+            </div>
+        </div>
+
+        {{ forms.textField({
+            label: 'Screen heading'|t('sesame'),
+            instructions: 'The small label above the prompt. Blank = inherit.'|t('sesame'),
+            id: 'brandHeading',
+            name: 'brandHeading',
+            value: rule.brandHeading,
+        }) }}
+
+        {{ forms.textField({
+            label: 'Accent colour'|t('sesame'),
+            instructions: 'A CSS colour (`#2f6f7e`, a keyword, or `rgb()`/`hsl()`). Blank = inherit.'|t('sesame'),
+            id: 'brandAccent',
+            name: 'brandAccent',
+            value: rule.brandAccent,
+            placeholder: '#2f6f7e',
+        }) }}
+
+        {{ forms.elementSelectField({
+            label: 'Logo'|t('sesame'),
+            instructions: 'Shown in place of the padlock icon. None = inherit.'|t('sesame'),
+            id: 'brandLogoId',
+            name: 'brandLogoId',
+            elementType: 'craft\\elements\\Asset',
+            limit: 1,
+            elements: brandLogo ? [brandLogo] : [],
+            criteria: { kind: ['image'] },
+        }) }}
+
         {% if not isNew %}
             <div class="field">
                 <div class="heading">

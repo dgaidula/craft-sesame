@@ -1,0 +1,54 @@
+{% extends '_layouts/cp' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Branding'|t('sesame') %}
+{% set fullPageForm = true %}
+{% set crumbs = [
+    { label: 'Sesame'|t('sesame'), url: url('sesame/rules') },
+] %}
+
+{% block content %}
+    <input type="hidden" name="action" value="sesame/branding/save">
+    {{ redirectInput('sesame/branding') }}
+
+    <p class="light" style="margin-bottom:16px;">
+        {{ 'These defaults style the password screen for every protected page. Any rule can override them on its own edit screen. Leave a field blank to use Sesame’s built-in look.'|t('sesame') }}
+    </p>
+
+    {{ forms.elementSelectField({
+        label: 'Logo'|t('sesame'),
+        instructions: 'Shown at the top of the password screen in place of the padlock icon.'|t('sesame'),
+        id: 'logoId',
+        name: 'logoId',
+        elementType: 'craft\\elements\\Asset',
+        limit: 1,
+        elements: logo ? [logo] : [],
+        criteria: { kind: ['image'] },
+    }) }}
+
+    {{ forms.textField({
+        label: 'Heading'|t('sesame'),
+        instructions: 'The small label above the prompt. Blank = the site’s name.'|t('sesame'),
+        id: 'heading',
+        name: 'heading',
+        value: defaults.heading,
+    }) }}
+
+    {{ forms.textareaField({
+        label: 'Intro'|t('sesame'),
+        instructions: 'The prompt shown to visitors. Blank = “This page is protected. Enter the password to continue.” A rule’s own Custom message overrides this per rule.'|t('sesame'),
+        id: 'intro',
+        name: 'intro',
+        value: defaults.intro,
+        rows: 2,
+    }) }}
+
+    {{ forms.textField({
+        label: 'Accent colour'|t('sesame'),
+        instructions: 'A CSS colour for the button and focus ring — a hex value (`#2f6f7e`), a colour keyword, or `rgb()`/`hsl()`. Blank = the built-in teal.'|t('sesame'),
+        id: 'accent',
+        name: 'accent',
+        value: defaults.accent,
+        placeholder: '#2f6f7e',
+    }) }}
+{% endblock %}

@@ -59,14 +59,25 @@ class Rule extends Model
     /** PRO. Remember-me opt-in per rule — read by {@see toScope()} and honored by {@see \iceboxind\sesame\services\Gate::unlock()} only when `Plugin::isPro()` and `Settings::$rememberMeDuration` > 0. */
     public bool $rememberMe = false;
 
+    /**
+     * PRO. Per-rule challenge-screen branding overrides (P1.3); null = inherit
+     * the site default ({@see \iceboxind\sesame\services\Branding}). The per-rule
+     * INTRO override is the existing {@see $message}. Authoring Pro-gated;
+     * rendered on every edition.
+     */
+    public ?string $brandHeading = null;
+    public ?string $brandAccent = null;
+    public ?int $brandLogoId = null;
+
     public function rules(): array
     {
         return [
             [['label', 'matchType', 'pattern'], 'required'],
             [['matchType'], 'in', 'range' => ['uri', 'section', 'entryType']],
             [['enabled', 'rememberMe'], 'boolean'],
-            [['sortOrder', 'epoch'], 'integer'],
-            [['label', 'pattern', 'templateOverride'], 'string', 'max' => 255],
+            [['sortOrder', 'epoch', 'brandLogoId'], 'integer'],
+            [['label', 'pattern', 'templateOverride', 'brandHeading'], 'string', 'max' => 255],
+            [['brandAccent'], 'string', 'max' => 32],
             [['message'], 'string'],
             [['protectFrom', 'protectUntil'], 'safe'],
         ];

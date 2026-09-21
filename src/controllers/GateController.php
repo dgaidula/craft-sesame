@@ -219,15 +219,25 @@ class GateController extends Controller
             $template = $scope->templateOverride;
         }
 
+        // Effective branding (P1.3): per-rule override ?? site default ?? the
+        // template's built-in look. `message` is the resolved intro (per-rule
+        // message ?? site intro ?? built-in prompt), so existing overrides keep
+        // working and template overrides still receive `message` unchanged.
+        $brand = Plugin::getInstance()->branding->resolveForScope($scope);
+
         return $this->renderTemplate($template, [
             'token' => $token,
             'return' => $return,
-            'message' => $scope->message ?: Craft::t('sesame', 'This page is protected. Enter the password to continue.'),
+            'message' => $brand['intro'] ?: Craft::t('sesame', 'This page is protected. Enter the password to continue.'),
             'error' => $error,
             'cooldown' => $cooldown,
             // PRO. The checkbox only ever appears when it could actually do
             // something — Lite visitors never see it.
             'showRememberMe' => Plugin::getInstance()->isPro() && $scope->rememberMe,
+            // Branding for the default screen; a custom template may use or ignore these.
+            'brandHeading' => $brand['heading'],
+            'brandAccent' => $brand['accent'],
+            'brandLogoUrl' => $brand['logoUrl'],
         ]);
     }
 
