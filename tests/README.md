@@ -84,6 +84,21 @@ baseline it (and you) can apply by hand between individual runs.
 `x-craft-preview` token, which can't be minted over raw HTTP; run it from a
 browser CP preview if you need it.
 
+`blitz-live-test.mjs` is a separate **opt-in** suite (not in `run-all`, since
+Blitz isn't a standard testbed dependency). It is the P0.1 "done means" static-
+cache test — unprotected page caches, challenge never cached, unlocked page
+never cached, and a page cached before protection is purged and challenged once
+a rule covers it. PHP delivery only (rewrite mode is the site's job). To run it:
+
+```sh
+cd ~/sw/github-private/craft5-plugin-testbed
+ddev composer require putyourlightson/craft-blitz -W
+ddev craft plugin/install blitz && ddev craft up
+# config/blitz.php: cachingEnabled => true, FileStorage,
+#   includedUriPatterns => [['siteId'=>'','uriPattern'=>'sesame-test/.*']]
+node ~/sw/github-public/craft-sesame/tests/blitz-live-test.mjs   # 8/8
+```
+
 To run a single suite instead:
 
 Logic suites (from the testbed directory):
