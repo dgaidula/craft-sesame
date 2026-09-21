@@ -61,7 +61,8 @@ the people who need to get in without a password.
 
 The roadmap rows are the next three Pro features, in that order. A pattern
 rule created on Pro keeps protecting its pages if the site later moves to
-Lite; only creating or changing one needs Pro.
+Lite; only creating one, or changing what it matches, needs Pro — its
+password, its on/off switch, and deleting it stay editable on Lite.
 
 ### Rename it in the control panel
 
@@ -125,7 +126,10 @@ Pro adds the tools for running access, not just setting it.
   > already holding a link, a session, or a remember-me cookie**; they must
   > re-enter the new password. To cut everyone off *without* changing the
   > password, use **Revoke all access now** on the rule’s edit screen (it bumps
-  > the epoch on its own). Disabling or deleting the rule still works too.
+  > the epoch on its own). Disabling or deleting the rule invalidates its magic
+  > links too, but note that it *unprotects* the page — it then renders
+  > publicly, unless another rule or the Protect field still covers it — rather
+  > than re-locking it behind the same password.
   > (Rotating the site’s `securityKey` remains the blunt instrument that also
   > invalidates every other signed Sesame token.) The same epoch applies to
   > per-entry (Protect field) passwords: changing or clearing one locks out
