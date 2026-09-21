@@ -113,22 +113,61 @@ public function isPro(): bool
 ```
 
 Every Pro gate funnels through `Plugin::isPro()`, server-side, at the
-narrowest choke point. Lite currently ignores the Pro-only columns already
-present in `{{%sesame_rules}}` (`codesJson`, `unlockUntil`, `rememberMe`)
-and never writes to `{{%sesame_access_log}}` — both tables/columns exist
-from `Install` so a future Pro build needs no destructive schema change,
-only new reads/writes gated behind `isPro()`.
+narrowest choke point — and **only for authoring/convenience, never for
+enforcement**. Anything protective keeps working if the edition drops to
+Lite; only *creating* the Pro shape is gated. `Rules::match()` has no edition
+check; a Pro-made pattern rule, a schedule, or a second named code all keep
+protecting after a downgrade.
+
+### Named codes (the credential model)
+
+A rule's credential is a **list of codes**, one row each in
+`{{%sesame_rule_codes}}` (see below) — there is no single `secret` column on
+the rule any more. **Code one** (the earliest, ordered by `dateCreated`) is the
+rule's password: it is the single **Password** field the Lite edit screen shows,
+and every rule always has exactly one. Pro adds more codes, each with its own
+label, optional expiry, individual revoke, and its own shareable magic link
+("send District A its own code and link; revoke it alone").
+
+- **Verify** loops the rule's *active* codes (not revoked, not expired), capped
+  at 25, after the throttle; the matching code's `uid` is the **codeId**.
+- **Session, remember-me cookie, and magic link carry `{epoch, codeId}`.**
+  `Gate::isUnlocked()` checks the rule epoch (coarse, rule-wide revocation from
+  P0.2) **and** that the recorded code is still active (fine, per-code
+  revoke/expiry). Two levels: bump the epoch to cut everyone off; revoke or
+  expire one code to cut off just its holders.
+- **Access log** records the `codeId` on every row.
+- **Edition gate (authoring only):** Lite shows one Password field (= code one)
+  and can always change or delete it; adding a *second* code is Pro. All codes
+  keep verifying on a downgrade. On a future release upgrade, an existing rule's
+  password becomes code one, labelled "Default".
+- The **per-entry Protect field** is unaffected — it keeps its single secret in
+  `{{%sesame_entry_secrets}}`; codes are a rule-only feature.
+
+The other Pro-only rule columns (`protectFrom`/`protectUntil` scheduling from
+P1.1, `rememberMe`, the `epoch`) and `{{%sesame_access_log}}` exist from
+`Install`; Lite simply doesn't author or write them.
 
 ## Data model and storage
 
 ### `{{%sesame_rules}}`
 
 One row per rule: `enabled`, `sortOrder`, `label`, `matchType`
-(`uri`/`section`/`entryType`), `pattern`, `secret`/`secretMode`, optional
-`message`/`templateOverride`, plus the Pro-only `codesJson`/`unlockUntil`/
-`rememberMe` columns. Content — editable on production regardless of
-`allowAdminChanges`, exactly like `Rules::save()`/`delete()`/`reorder()`
-write it.
+(`uri`/`section`/`entryType`), `pattern`, optional `message`/`templateOverride`,
+the `epoch` (revocation counter, both editions), and the Pro-only
+`protectFrom`/`protectUntil` (scheduling) and `rememberMe` columns. **No secret
+lives here** — the rule's password(s) are rows in `{{%sesame_rule_codes}}`.
+Content — editable on production regardless of `allowAdminChanges`, exactly like
+`Rules::save()`/`delete()`/`reorder()` write it.
+
+### `{{%sesame_rule_codes}}`
+
+One row per named code: `ruleUid` (the owning rule), `label`, `secret`/`secretMode`
+(encoded exactly like an entry secret), `expiresAt`/`revokedAt` (both nullable),
+`dateCreated`. The earliest by `dateCreated` is "code one" (the rule's password).
+Written and read through the `Codes` service — `forRule` / `activeForRule` / `add`
+/ `relabel` / `setExpiry` / `changePassword` / `revoke` / `codeOne`. Content, like
+the rules table.
 
 ### `{{%sesame_entry_secrets}}`
 

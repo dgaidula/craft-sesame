@@ -126,7 +126,7 @@
     }) }}
 
     {% if not isNew %}
-        {% if rule.secretMode == 'encrypt' %}
+        {% if codeOneMode == 'encrypt' %}
             <div class="field">
                 <button type="button" class="btn" id="sesame-reveal-btn" data-uid="{{ rule.uid }}">{{ 'Reveal current password'|t('sesame') }}</button>
                 <p id="sesame-reveal-result" class="light" style="margin-top:6px;"></p>

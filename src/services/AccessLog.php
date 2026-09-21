@@ -22,8 +22,12 @@ use iceboxind\sesame\Plugin;
  */
 class AccessLog extends Component
 {
-    /** @var 'unlock'|'link'|'fail'|'throttle'|'reveal' $event */
-    public function record(string $event, ?Scope $scope, Request $request): void
+    /**
+     * @param 'unlock'|'link'|'fail'|'throttle'|'reveal' $event
+     * @param ?string $codeId The named code the unlock/link/reveal used; null for
+     *                a per-entry unlock, a fail, or a throttle.
+     */
+    public function record(string $event, ?Scope $scope, Request $request, ?string $codeId = null): void
     {
         if (!Plugin::getInstance()->isPro() || $scope === null) {
             return;
@@ -43,6 +47,7 @@ class AccessLog extends Component
             'elementId' => $elementId,
             // The acting user, if any (null for an anonymous front-end visitor).
             'userId' => Craft::$app->getUser()->getId(),
+            'codeId' => $codeId,
             'scopeKey' => Plugin::getInstance()->gate->scopeKey($scope),
             'event' => $event,
             'ip' => $request->getUserIP() ?: '0.0.0.0',

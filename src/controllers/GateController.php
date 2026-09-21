@@ -79,11 +79,19 @@ class GateController extends Controller
             throw new NotFoundHttpException(Craft::t('sesame', 'This link has expired or is no longer valid.'));
         }
 
-        $gate->unlock($scope);
+        // A rule link is minted PER CODE, and its code must still be active —
+        // so revoking or expiring that one code kills its links, independent of
+        // the rule epoch. A link with no code id is malformed.
+        $codeId = $data['codeId'];
+        if ($codeId === null || !Plugin::getInstance()->codes->isActive($codeId)) {
+            throw new NotFoundHttpException(Craft::t('sesame', 'This link has expired or is no longer valid.'));
+        }
+
+        $gate->unlock($scope, false, $codeId);
         // A distinct 'link' event, not 'unlock': a mail scanner or chat
         // unfurler that prefetches the link records here, and lumping those in
         // with real password unlocks would pollute the audit trail.
-        Plugin::getInstance()->accessLog->record('link', $scope, Craft::$app->getRequest());
+        Plugin::getInstance()->accessLog->record('link', $scope, Craft::$app->getRequest(), $codeId);
 
         return $this->redirect($this->safeReturn($data['target'], '/'));
     }
@@ -122,19 +130,24 @@ class GateController extends Controller
         // bot that autofills the standard field fails verification. Not built;
         // Lite/Pro both skip straight to the throttle + password checks.
 
-        if (!Plugin::getInstance()->secrets->verify($password, $scope->secret, $scope->secretMode)) {
+        // Verify against the scope's credential(s): a per-entry secret, or the
+        // rule's active named codes (capped). The matching code's id is recorded
+        // on the unlock so it can be revoked/expired individually later.
+        $result = $gate->verify($scope, $password);
+        if (!$result['matched']) {
             $throttle->record($ip, $scopeKey);
             Plugin::getInstance()->accessLog->record('fail', $scope, $request);
             return $this->renderChallenge($scope, $t, $return, Craft::t('sesame', 'Incorrect password.'));
         }
+        $codeId = $result['codeId'];
 
         // PRO. Only meaningful when the scope's rule opted in AND a duration
         // is configured — Gate::unlock() itself no-ops the cookie otherwise
         // (and always on Lite). The checkbox that produces this is only
         // ever rendered under those same conditions (see renderChallenge()).
         $remember = (bool) $request->getBodyParam('remember', false);
-        $gate->unlock($scope, $remember);
-        Plugin::getInstance()->accessLog->record('unlock', $scope, $request);
+        $gate->unlock($scope, $remember, $codeId);
+        Plugin::getInstance()->accessLog->record('unlock', $scope, $request, $codeId);
 
         // `redirect` is the hashed field from the template's redirectInput();
         // $return is only the un-trusted display default (never trusted on

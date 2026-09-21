@@ -47,13 +47,18 @@ class Gate extends Component
 
     public function isUnlocked(Scope $scope): bool
     {
-        // The session value is a shape ({@see unlock()}), not a bare `true`, so
-        // it can carry the revocation epoch (and, later, a Pro code id). A
-        // stored epoch that no longer matches the live one — because the
-        // password changed or access was revoked — is treated as not unlocked,
-        // and any legacy bare `true` (never an array) fails closed too.
+        // The session value is a shape ({@see unlock()}), `{e: epoch, c: codeId}`,
+        // not a bare `true`. It's a valid unlock only when the stored epoch still
+        // matches the live one (rule-wide revocation — password change or Revoke
+        // all) AND the named code it was granted with is still active (per-code
+        // revoke/expiry). A per-entry unlock carries no code (c = null). Any
+        // legacy bare `true` (never an array) fails closed.
         $stored = Craft::$app->getSession()->get($this->sessionKey($scope), null);
-        if (is_array($stored) && (int) ($stored['e'] ?? -1) === $scope->epoch) {
+        if (
+            is_array($stored)
+            && (int) ($stored['e'] ?? -1) === $scope->epoch
+            && $this->storedCodeActive($stored)
+        ) {
             return true;
         }
 
@@ -63,12 +68,43 @@ class Gate extends Component
     }
 
     /**
+     * Verifies a submitted password for a scope and returns the outcome plus the
+     * codeId that matched. A per-entry scope has one secret and no code (codeId
+     * null); a rule scope verifies against its ACTIVE named codes
+     * ({@see \iceboxind\sesame\services\Codes}), capped, first match wins.
+     *
+     * @return array{matched:bool,codeId:?string}
+     */
+    public function verify(Scope $scope, string $password): array
+    {
+        if ($scope->type === 'entry') {
+            $ok = Plugin::getInstance()->secrets->verify($password, $scope->secret, $scope->secretMode);
+            return ['matched' => $ok, 'codeId' => null];
+        }
+
+        foreach (Plugin::getInstance()->codes->activeForRule($scope->uid) as $code) {
+            if (Plugin::getInstance()->secrets->verify($password, $code->secret, $code->secretMode)) {
+                return ['matched' => true, 'codeId' => $code->uid];
+            }
+        }
+
+        return ['matched' => false, 'codeId' => null];
+    }
+
+    /** Whether the code a stored unlock/cookie was granted with is still active (null code = per-entry, always ok). */
+    private function storedCodeActive(array $stored): bool
+    {
+        $codeId = $stored['c'] ?? null;
+        return $codeId === null || Plugin::getInstance()->codes->isActive((string) $codeId);
+    }
+
+    /**
      * @param bool $remember PRO. When true (and the scope's rule opted in via
      * `rememberMe`, and `settings.rememberMeDuration` > 0, and the edition is
      * Pro), also sets a persistent signed cookie so the unlock survives
      * session expiry. Ignored entirely on Lite.
      */
-    public function unlock(Scope $scope, bool $remember = false): void
+    public function unlock(Scope $scope, bool $remember = false, ?string $codeId = null): void
     {
         $session = Craft::$app->getSession();
 
@@ -82,16 +118,16 @@ class Gate extends Component
         $session->open();
         $session->regenerateID(true);
 
-        // Store the epoch this unlock was granted under, not a bare `true`, so
-        // {@see isUnlocked()} can revoke it when the epoch is later bumped. An
-        // array (rather than the int alone) keeps room for a Pro code id (`c`)
-        // without another session-shape change later.
-        $session->set($this->sessionKey($scope), ['e' => $scope->epoch]);
+        // Store the epoch AND the codeId this unlock was granted with, so
+        // {@see isUnlocked()} can revoke it either rule-wide (epoch bump) or
+        // per-code (that code revoked/expired). codeId is null for a per-entry
+        // unlock.
+        $session->set($this->sessionKey($scope), ['e' => $scope->epoch, 'c' => $codeId]);
 
         if ($remember && $scope->rememberMe && Plugin::getInstance()->isPro()) {
             $duration = Plugin::getInstance()->getSettings()->rememberMeDuration;
             if ($duration > 0) {
-                $this->setRememberCookie($scope, $duration);
+                $this->setRememberCookie($scope, $duration, $codeId);
             }
         }
     }
@@ -109,11 +145,12 @@ class Gate extends Component
     // links). Acceptable here; called out so it's a deliberate choice, not an
     // oversight.
 
-    private function setRememberCookie(Scope $scope, int $duration): void
+    private function setRememberCookie(Scope $scope, int $duration, ?string $codeId = null): void
     {
         $value = Craft::$app->getSecurity()->hashData(Json::encode([
             'k' => $this->scopeKey($scope),
             'ep' => $scope->epoch,
+            'c' => $codeId,
             'exp' => time() + $duration,
         ]));
 
@@ -145,8 +182,12 @@ class Gate extends Component
         }
 
         // A cookie minted under a superseded epoch is revoked, exactly like a
-        // stale session value.
+        // stale session value; and the code it was granted with must still be
+        // active (per-code revoke/expiry).
         if ((int) ($data['ep'] ?? -1) !== $scope->epoch) {
+            return false;
+        }
+        if (!$this->storedCodeActive($data)) {
             return false;
         }
 
@@ -161,13 +202,14 @@ class Gate extends Component
 
     // --- PRO: shareable magic links ---
 
-    /** Signs a time-limited link token: scope type+uid (re-resolved live on click, never trusted from the token) + the epoch it was minted under + an optional redirect target + expiry. */
-    public function signMagicLink(Scope $scope, int $ttl, string $target = ''): string
+    /** Signs a time-limited link token: scope type+uid (re-resolved live on click, never trusted from the token) + the epoch and the codeId it was minted for + an optional redirect target + expiry. A link is minted PER CODE, so revoking that code kills its links. */
+    public function signMagicLink(Scope $scope, int $ttl, string $target = '', ?string $codeId = null): string
     {
         return Craft::$app->getSecurity()->hashData(Json::encode([
             'type' => $scope->type,
             'uid' => $scope->uid,
             'ep' => $scope->epoch,
+            'c' => $codeId,
             'target' => $target,
             'exp' => time() + $ttl,
         ]));
@@ -180,7 +222,7 @@ class Gate extends Component
      * matches an enabled rule (and that the epoch still matches) before
      * unlocking anything.
      *
-     * @return array{type:string,uid:string,epoch:int,target:string}|null
+     * @return array{type:string,uid:string,epoch:int,codeId:?string,target:string}|null
      */
     public function readMagicLink(string $token): ?array
     {
@@ -194,10 +236,13 @@ class Gate extends Component
             return null;
         }
 
+        $codeId = $data['c'] ?? null;
+
         return [
             'type' => (string) $data['type'],
             'uid' => (string) $data['uid'],
             'epoch' => (int) ($data['ep'] ?? -1),
+            'codeId' => $codeId === null ? null : (string) $codeId,
             'target' => (string) ($data['target'] ?? ''),
         ];
     }

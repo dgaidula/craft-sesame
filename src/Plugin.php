@@ -23,6 +23,7 @@ use craft\web\View;
 use iceboxind\sesame\fields\Protect;
 use iceboxind\sesame\models\Settings;
 use iceboxind\sesame\services\AccessLog;
+use iceboxind\sesame\services\Codes;
 use iceboxind\sesame\services\Gate;
 use iceboxind\sesame\services\Rules;
 use iceboxind\sesame\services\Secrets;
@@ -41,6 +42,7 @@ use yii\base\Event;
  * challenge instead of the page.
  *
  * @property-read Rules $rules
+ * @property-read Codes $codes
  * @property-read Secrets $secrets
  * @property-read Gate $gate
  * @property-read Throttle $throttle
@@ -79,6 +81,7 @@ class Plugin extends BasePlugin
         return [
             'components' => [
                 'rules' => Rules::class,
+                'codes' => Codes::class,
                 'secrets' => Secrets::class,
                 'gate' => Gate::class,
                 'throttle' => Throttle::class,

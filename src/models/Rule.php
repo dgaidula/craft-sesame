@@ -29,11 +29,9 @@ class Rule extends Model
     /** A URI glob (`members`, `members/*`), or a section/entry-type handle. */
     public string $pattern = '';
 
-    /** The stored (encrypted or bcrypt-hashed) secret — never plaintext. */
-    public string $secret = '';
-
-    /** @var 'encrypt'|'hash' */
-    public string $secretMode = 'encrypt';
+    // The rule's secret(s) are NOT stored here any more — they are rows in
+    // {{%sesame_rule_codes}}, one per named code, owned by the Codes service.
+    // "Code one" (earliest) is the rule's password. See docs/DEVELOPMENT.md.
 
     public ?string $message = null;
     public ?string $templateOverride = null;
@@ -48,9 +46,6 @@ class Rule extends Model
     public int $epoch = 0;
 
     // --- Pro columns: present in schema, Lite ignores them. ---
-
-    /** PRO. Multiple named codes (JSON). TODO Pro: not yet read anywhere. */
-    public ?string $codesJson = null;
 
     /**
      * PRO. Scheduled lock/unlock (P1.1). The rule protects only within
@@ -69,11 +64,10 @@ class Rule extends Model
         return [
             [['label', 'matchType', 'pattern'], 'required'],
             [['matchType'], 'in', 'range' => ['uri', 'section', 'entryType']],
-            [['secretMode'], 'in', 'range' => ['encrypt', 'hash']],
             [['enabled', 'rememberMe'], 'boolean'],
             [['sortOrder', 'epoch'], 'integer'],
             [['label', 'pattern', 'templateOverride'], 'string', 'max' => 255],
-            [['message', 'secret', 'codesJson'], 'string'],
+            [['message'], 'string'],
             [['protectFrom', 'protectUntil'], 'safe'],
         ];
     }
@@ -116,7 +110,12 @@ class Rule extends Model
         return true;
     }
 
-    /** Builds the {@see Scope} this rule protects with, for the gate to check. */
+    /**
+     * Builds the {@see Scope} this rule protects with, for the gate to check.
+     * No secret rides on a rule scope any more — the gate verifies a submitted
+     * password against the rule's active codes ({@see \iceboxind\sesame\services\Codes}),
+     * keyed by this scope's uid.
+     */
     public function toScope(): Scope
     {
         return new Scope([
@@ -124,8 +123,6 @@ class Rule extends Model
             'uid' => (string) $this->uid,
             'message' => $this->message,
             'templateOverride' => $this->templateOverride,
-            'secret' => $this->secret,
-            'secretMode' => $this->secretMode,
             'epoch' => $this->epoch,
             'rememberMe' => $this->rememberMe,
         ]);

@@ -15,8 +15,11 @@ use craft\db\Migration;
  */
 class Install extends Migration
 {
-    /** Multi-row rule set: URI/section/entry-type matches → a stored secret. */
+    /** Multi-row rule set: URI/section/entry-type matches. Secrets live in the codes table. */
     public const RULES_TABLE = '{{%sesame_rules}}';
+
+    /** A rule's named codes (its passwords); the earliest is "code one". */
+    public const RULE_CODES_TABLE = '{{%sesame_rule_codes}}';
 
     /** PRO: per-unlock audit trail. Schema created now; Lite never writes to it. */
     public const ACCESS_LOG_TABLE = '{{%sesame_access_log}}';
@@ -34,19 +37,16 @@ class Install extends Migration
                 'label' => $this->string()->notNull(),
                 'matchType' => $this->string(20)->notNull(), // uri | section | entryType
                 'pattern' => $this->string()->notNull(),
-                'secret' => $this->text(), // stored (encrypted or bcrypt), NEVER plaintext
-                'secretMode' => $this->string(10)->notNull()->defaultValue('encrypt'), // encrypt | hash
                 'message' => $this->text(),
                 'templateOverride' => $this->string(),
-                // Revocation epoch (both editions): bumped whenever this rule's
+                // Revocation epoch (both editions): bumped whenever a code's
                 // password changes or an admin revokes access. A session /
                 // remember-me cookie / magic link carries the epoch it was
                 // minted under; the gate compares it against this live value, so
                 // a password change instantly cuts off everyone holding an old
-                // one. See services/Gate.php.
+                // one. See services/Gate.php. (Per-code revoke/expiry is finer —
+                // see the codes table.)
                 'epoch' => $this->integer()->notNull()->defaultValue(0),
-                // Pro columns — present in schema, Lite never reads/writes them.
-                'codesJson' => $this->text(),
                 // Scheduled lock/unlock (P1.1): the rule protects only within the
                 // window [protectFrom, protectUntil). Either bound is nullable —
                 // null protectFrom = active from the start, null protectUntil =
@@ -59,6 +59,27 @@ class Install extends Migration
                 'uid' => $this->uid(),
             ]);
             $this->createIndex(null, self::RULES_TABLE, ['sortOrder']);
+            // Unique so the codes table can foreign-key ruleUid → rules.uid.
+            $this->createIndex(null, self::RULES_TABLE, ['uid'], true);
+        }
+
+        if (!$this->db->tableExists(self::RULE_CODES_TABLE)) {
+            $this->createTable(self::RULE_CODES_TABLE, [
+                'id' => $this->primaryKey(),
+                'ruleUid' => $this->uid()->notNull(),
+                'label' => $this->string(), // editor-facing; "code one" defaults to "Default"
+                'secret' => $this->text()->notNull(), // encoded (encrypt or bcrypt), NEVER plaintext
+                'secretMode' => $this->string(10)->notNull()->defaultValue('encrypt'), // encrypt | hash
+                'expiresAt' => $this->dateTime(), // null = never expires
+                'revokedAt' => $this->dateTime(), // null = not revoked
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(), // the codeId carried by sessions / cookies / links
+            ]);
+            $this->createIndex(null, self::RULE_CODES_TABLE, ['ruleUid']);
+            $this->createIndex(null, self::RULE_CODES_TABLE, ['uid'], true);
+            // A rule's codes are deleted with the rule.
+            $this->addForeignKey(null, self::RULE_CODES_TABLE, ['ruleUid'], self::RULES_TABLE, ['uid'], 'CASCADE', null);
         }
 
         if (!$this->db->tableExists(self::ACCESS_LOG_TABLE)) {
@@ -70,6 +91,9 @@ class Install extends Migration
                 // anonymous front-end unlock/fail/throttle, set for a reveal (and
                 // any unlock by a logged-in user). "Who" is the key audit field.
                 'userId' => $this->integer(),
+                // The named code the unlock/link/reveal used (a sesame_rule_codes
+                // uid); null for a per-entry-field unlock, a fail, or a throttle.
+                'codeId' => $this->string(),
                 'scopeKey' => $this->string()->notNull(),
                 'event' => $this->string(20)->notNull(), // unlock | link | fail | throttle | reveal
                 'ip' => $this->string(45)->notNull(), // long enough for IPv6
@@ -105,8 +129,10 @@ class Install extends Migration
 
     public function safeDown(): bool
     {
-        // Drop the FK-holding table first.
+        // Drop FK-holding tables first (access log → rules/elements/users;
+        // rule codes → rules).
         $this->dropTableIfExists(self::ACCESS_LOG_TABLE);
+        $this->dropTableIfExists(self::RULE_CODES_TABLE);
         $this->dropTableIfExists(self::ENTRY_SECRETS_TABLE);
         $this->dropTableIfExists(self::RULES_TABLE);
         return true;

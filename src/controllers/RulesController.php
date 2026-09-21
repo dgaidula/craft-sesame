@@ -97,15 +97,12 @@ class RulesController extends Controller
             }
         }
 
-        // A blank password on an EXISTING rule keeps the stored secret
-        // unchanged — $rule was hydrated from the saved row above, so
-        // secret/secretMode are already correct unless we overwrite them below.
+        // The single Password field is the rule's "code one" (see the Codes
+        // service). A blank password on an EXISTING rule leaves code one alone; a
+        // new rule requires one. The actual store/rotate happens AFTER the rule
+        // saves (code one needs the rule's uid), below.
         $password = (string) $request->getBodyParam('password', '');
-        if ($password !== '') {
-            $encoded = Plugin::getInstance()->secrets->store($password);
-            $rule->secret = $encoded['secret'];
-            $rule->secretMode = $encoded['mode'];
-        } elseif ($isNew) {
+        if ($password === '' && $isNew) {
             $rule->addError('secret', Craft::t('sesame', 'A password is required.'));
         }
 
@@ -127,17 +124,31 @@ class RulesController extends Controller
             }
         }
 
-        // Bump the revocation epoch — cutting off every outstanding session,
-        // remember-me cookie, and magic link — when an existing rule's credential
-        // OR its target changes. A password change is the obvious case; retargeting
-        // (e.g. `members` → `board-minutes/*`) matters too, or a holder of the old
-        // unlock would keep access to content the rule was never granted for. A
-        // new rule starts fresh (nobody holds an unlock), so it never bumps.
-        $bumpEpoch = !$isNew && ($password !== '' || $targetChanged);
+        // Bump the revocation epoch when the rule's TARGET changes (retargeting
+        // e.g. `members` → `board-minutes/*` would otherwise leave old unlocks
+        // valid for content they were never granted). A PASSWORD change bumps the
+        // epoch too, but that happens in Codes::changePassword() below, not here.
+        $bumpEpoch = !$isNew && $targetChanged;
 
         if ($rule->hasErrors() || !Plugin::getInstance()->rules->save($rule, $bumpEpoch)) {
             Craft::$app->getSession()->setError(Craft::t('sesame', 'Couldn’t save the rule.'));
             return $this->renderEdit($rule);
+        }
+
+        // Code one carries the rule's password. Create it on a new rule; rotate it
+        // when a non-blank password was posted on an edit (changePassword bumps
+        // the rule epoch). A blank password on an edit leaves code one untouched.
+        $codes = Plugin::getInstance()->codes;
+        $ruleUid = (string) $rule->uid;
+        if ($isNew) {
+            $codes->add($ruleUid, $password, Craft::t('sesame', 'Default'));
+        } elseif ($password !== '') {
+            $codeOne = $codes->codeOne($ruleUid);
+            if ($codeOne !== null) {
+                $codes->changePassword($codeOne->uid, $password);
+            } else {
+                $codes->add($ruleUid, $password, Craft::t('sesame', 'Default'));
+            }
         }
 
         Craft::$app->getSession()->setNotice(Craft::t('sesame', 'Rule saved.'));
@@ -219,6 +230,18 @@ class RulesController extends Controller
             throw new NotFoundHttpException(Craft::t('sesame', 'Rule not found.'));
         }
 
+        // A link is minted for ONE code, so revoking that code kills its links.
+        // The management UI (a later pass) will let the editor pick a code; for
+        // now default to a posted codeId, else code one. The code must belong to
+        // this rule and be active.
+        $codeId = (string) Craft::$app->getRequest()->getBodyParam('codeId', '');
+        $code = $codeId !== ''
+            ? Plugin::getInstance()->codes->getByUid($codeId)
+            : Plugin::getInstance()->codes->codeOne($uid);
+        if ($code === null || $code->ruleUid !== $uid || !$code->isActive()) {
+            return $this->asJson(['error' => Craft::t('sesame', 'That code is no longer available to link.')]);
+        }
+
         // Default 7 days, editor-adjustable per mint via `ttlDays`, capped at a
         // year so a fat-fingered value can't mint an effectively-permanent link.
         $ttlDays = max(1, min(365, (int) Craft::$app->getRequest()->getBodyParam('ttlDays', 7)));
@@ -237,7 +260,7 @@ class RulesController extends Controller
             ? '/' . ltrim($rule->pattern, '/')
             : '';
 
-        $token = Plugin::getInstance()->gate->signMagicLink($rule->toScope(), $ttl, $target);
+        $token = Plugin::getInstance()->gate->signMagicLink($rule->toScope(), $ttl, $target, $code->uid);
 
         return $this->asJson([
             'url' => UrlHelper::siteUrl('sesame/gate/link', ['t' => $token]),
@@ -246,9 +269,10 @@ class RulesController extends Controller
     }
 
     /**
-     * Returns the current password for CP display — decrypted, encrypt-mode
-     * only. Hash-mode rules are write-only, so this returns null and the
-     * edit screen shows "written-only" instead of a value.
+     * Returns a code's current password for CP display — decrypted, encrypt-mode
+     * only. Hash-mode codes are write-only, so this returns null and the edit
+     * screen shows "written-only" instead. Defaults to the rule's code one (the
+     * single Password field); the management UI (later pass) passes a codeId.
      */
     public function actionRevealPassword(): Response
     {
@@ -260,14 +284,20 @@ class RulesController extends Controller
         // drives this through Craft.elevatedSessionManager before it fetches.
         $this->requireElevatedSession();
 
-        $uid = (string) Craft::$app->getRequest()->getRequiredBodyParam('uid');
+        $uid = (string) Craft::$app->getRequest()->getRequiredBodyParam('uid'); // rule uid
+        $codeId = (string) Craft::$app->getRequest()->getBodyParam('codeId', '');
+        $codes = Plugin::getInstance()->codes;
 
         $rule = Plugin::getInstance()->rules->getByUid($uid);
-        $password = $rule ? Plugin::getInstance()->secrets->reveal($rule->secret, $rule->secretMode) : null;
+        $code = $codeId !== '' ? $codes->getByUid($codeId) : $codes->codeOne($uid);
+        // Guard: the code must belong to the named rule.
+        $password = ($rule !== null && $code !== null && $code->ruleUid === $uid)
+            ? $codes->reveal($code->uid)
+            : null;
 
         // Audit the disclosure (Pro only, like every other access-log write).
         if ($rule !== null) {
-            Plugin::getInstance()->accessLog->record('reveal', $rule->toScope(), Craft::$app->getRequest());
+            Plugin::getInstance()->accessLog->record('reveal', $rule->toScope(), Craft::$app->getRequest(), $code?->uid);
         }
 
         return $this->asJson(['password' => $password]);
@@ -276,6 +306,10 @@ class RulesController extends Controller
     private function renderEdit(Rule $rule): Response
     {
         $entries = Craft::$app->getEntries();
+
+        // Code one's storage mode drives the reveal-password UI (encrypt → can
+        // reveal; hash → write-only). Null on a new rule (no code yet).
+        $codeOne = $rule->uid ? Plugin::getInstance()->codes->codeOne((string) $rule->uid) : null;
 
         $sectionOptions = array_map(
             static fn($section) => ['label' => $section->name, 'value' => $section->handle],
@@ -300,6 +334,8 @@ class RulesController extends Controller
             // widgets — stored as UTC strings.
             'protectFromDate' => $rule->protectFrom ? DateTimeHelper::toDateTime($rule->protectFrom) : null,
             'protectUntilDate' => $rule->protectUntil ? DateTimeHelper::toDateTime($rule->protectUntil) : null,
+            // 'encrypt' | 'hash' | null — code one's storage mode for the reveal UI.
+            'codeOneMode' => $codeOne?->secretMode,
         ]);
     }
 }
