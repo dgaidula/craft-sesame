@@ -71,11 +71,19 @@ class Gate extends Component
      */
     public function unlock(Scope $scope, bool $remember = false): void
     {
+        $session = Craft::$app->getSession();
+
+        // Session-fixation defense: unlocking is a privilege change, so a
+        // visitor who arrived with an attacker-fixed session id must not keep
+        // it. Regenerate before storing the unlock so the granted access lives
+        // only under the fresh id (existing session data is migrated).
+        $session->regenerateID(true);
+
         // Store the epoch this unlock was granted under, not a bare `true`, so
         // {@see isUnlocked()} can revoke it when the epoch is later bumped. An
         // array (rather than the int alone) keeps room for a Pro code id (`c`)
         // without another session-shape change later.
-        Craft::$app->getSession()->set($this->sessionKey($scope), ['e' => $scope->epoch]);
+        $session->set($this->sessionKey($scope), ['e' => $scope->epoch]);
 
         if ($remember && $scope->rememberMe && Plugin::getInstance()->isPro()) {
             $duration = Plugin::getInstance()->getSettings()->rememberMeDuration;
