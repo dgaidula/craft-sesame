@@ -57,7 +57,7 @@ class Gate extends Component
         if (
             is_array($stored)
             && (int) ($stored['e'] ?? -1) === $scope->epoch
-            && $this->storedCodeActive($stored)
+            && $this->storedCodeActive($stored, $scope)
         ) {
             return true;
         }
@@ -91,11 +91,26 @@ class Gate extends Component
         return ['matched' => false, 'codeId' => null];
     }
 
-    /** Whether the code a stored unlock/cookie was granted with is still active (null code = per-entry, always ok). */
-    private function storedCodeActive(array $stored): bool
+    /**
+     * Whether the code a stored unlock/cookie was granted with still grants
+     * access for this scope. A per-entry unlock carries no code — the epoch match
+     * is enough. A RULE unlock must name a code that (a) exists and is active and
+     * (b) belongs to THIS rule, so a stale/absent code id, or a code id copied
+     * from another rule, can never keep a session valid.
+     */
+    private function storedCodeActive(array $stored, Scope $scope): bool
     {
+        if ($scope->type !== 'rule') {
+            return true;
+        }
+
         $codeId = $stored['c'] ?? null;
-        return $codeId === null || Plugin::getInstance()->codes->isActive((string) $codeId);
+        if ($codeId === null) {
+            return false;
+        }
+
+        $code = Plugin::getInstance()->codes->getByUid((string) $codeId);
+        return $code !== null && $code->ruleUid === $scope->uid && $code->isActive();
     }
 
     /**
@@ -187,7 +202,7 @@ class Gate extends Component
         if ((int) ($data['ep'] ?? -1) !== $scope->epoch) {
             return false;
         }
-        if (!$this->storedCodeActive($data)) {
+        if (!$this->storedCodeActive($data, $scope)) {
             return false;
         }
 

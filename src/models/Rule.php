@@ -6,14 +6,13 @@ use craft\base\Model;
 
 /**
  * One row of {{%sesame_rules}} — an editor-defined match (a URI glob, a
- * section handle, or an entry-type handle) that protects everything it
- * matches with a single shared password.
+ * section handle, or an entry-type handle) that protects everything it matches.
  *
- * `secret`/`secretMode` hold the ALREADY-ENCODED value from
- * {@see \iceboxind\sesame\services\Secrets::store()} — this model never
- * carries a raw password; the CP save action (presentation layer) is
- * responsible for calling Secrets::store() on a posted password before
- * building/saving a Rule.
+ * The rule holds NO secret of its own: its password(s) are rows in
+ * {{%sesame_rule_codes}}, owned by {@see \iceboxind\sesame\services\Codes}, and
+ * "code one" (the earliest) is the rule's primary password. This model carries
+ * only the match definition, the revocation epoch, and the Pro-only scheduling,
+ * remember-me, and branding columns.
  */
 class Rule extends Model
 {

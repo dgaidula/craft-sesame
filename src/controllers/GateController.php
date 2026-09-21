@@ -93,6 +93,8 @@ class GateController extends Controller
         // with real password unlocks would pollute the audit trail.
         Plugin::getInstance()->accessLog->record('link', $scope, Craft::$app->getRequest(), $codeId);
 
+        // The link grants access; don't let the redirect response be cached.
+        Craft::$app->getResponse()->setNoCacheHeaders();
         return $this->redirect($this->safeReturn($data['target'], '/'));
     }
 
@@ -202,8 +204,12 @@ class GateController extends Controller
     ): Response {
         // Best-effort front-end hygiene for a page that must exist behind a
         // password (see the README's leak-caveats section for what this does
-        // and doesn't cover).
-        Craft::$app->getResponse()->getHeaders()->set('X-Robots-Tag', 'none');
+        // and doesn't cover). The EVENT_SET_ROUTE gate already sets no-cache when
+        // it routes here, but a direct hit to the action URL (or the unlock
+        // POST's re-render) doesn't go through it — so set the headers here too.
+        $response = Craft::$app->getResponse();
+        $response->getHeaders()->set('X-Robots-Tag', 'none');
+        $response->setNoCacheHeaders();
 
         // A per-rule template override is only validated as `string, max 255`
         // at save (Rule::rules), so a typo, a path to a template that was later

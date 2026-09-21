@@ -340,7 +340,12 @@ class Plugin extends BasePlugin
      */
     private function warnIfCacheIsDummy(): void
     {
-        if ($this->cacheIsDummy()) {
+        // Only log on a CP request, not on every anonymous front-end hit — the
+        // persistent notice on the settings screen ({@see settingsHtml()}) is the
+        // always-on signal; this just leaves a trace where an admin will see it.
+        // (instanceof guards against a console request, which has no getIsCpRequest.)
+        $request = Craft::$app->getRequest();
+        if ($this->cacheIsDummy() && $request instanceof \craft\web\Request && $request->getIsCpRequest()) {
             Craft::warning(
                 'Sesame brute-force throttling is disabled: the site’s cache component is DummyCache.',
                 __METHOD__
