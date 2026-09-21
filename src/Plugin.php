@@ -310,18 +310,23 @@ class Plugin extends BasePlugin
                     return;
                 }
 
-                // Live Preview / a signed preview request made by a logged-in
-                // user bypasses the gate: an editor previewing their own
-                // (possibly unpublished) content is authenticated and explicit,
-                // so the password screen would only get in the way. The bypass
-                // is deliberately AND-ed with "not a guest": a Craft "Share"
-                // link is also a signed preview request but can be opened
-                // anonymously, and a shared preview of a protected page must
-                // still respect the password. A logged-in editor merely browsing
-                // the live front end (no preview token) is still gated — only the
-                // explicit preview flow is exempt.
+                // Live Preview bypasses the gate for a user who can actually VIEW
+                // this entry — an editor previewing their own (possibly
+                // unpublished) content is explicit, so the password screen would
+                // only get in the way. The check is `getIsPreview() &&
+                // $entry->canView($user)`, NOT merely "logged in": Craft's preview
+                // param is an unbound, non-expiring signed nonce that rides on
+                // every preview URL and draft Share link, and getIsGuest() is true
+                // for any account at all — so "logged in + any nonce" would let a
+                // public-registration member or a section-scoped author read every
+                // protected page. Gating on canView() scopes the bypass to real
+                // editors of THIS entry (viewEntries permission / authorship), and
+                // getIsPreview() keeps a logged-in editor merely browsing the live
+                // front end still gated. An anonymous Share-link visitor is gated
+                // either way (no identity → canView false).
                 $request = Craft::$app->getRequest();
-                if ($request->getIsPreview() && !Craft::$app->getUser()->getIsGuest()) {
+                $user = Craft::$app->getUser()->getIdentity();
+                if ($request->getIsPreview() && $user !== null && $entry->canView($user)) {
                     return;
                 }
 

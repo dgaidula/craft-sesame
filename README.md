@@ -180,13 +180,14 @@ who requests a protected entry's normal front-end URL, without a valid
 session unlock, gets the password screen instead of the page — every time,
 with no template code required to make that true.
 
-**Previewing:** a **logged-in** editor using Live Preview or the entry's
-Preview button sees the real page, not the password screen — they're
-authenticated and explicitly previewing their own content. An **anonymous**
-visitor is always gated, *including* someone opening a Craft “Share” preview
-link: a shared preview of a protected page still requires the password. A
-logged-in editor simply browsing the live front end (no preview token) is
-gated too — only the explicit preview flow is exempt.
+**Previewing:** an editor **who can view the entry** (the section’s
+`viewEntries` permission, or authorship) sees the real page in Live Preview or
+the Preview button, not the password screen — they’re explicitly previewing
+their own content. Everyone else is gated: an **anonymous** visitor (including
+someone opening a Craft “Share” preview link), a logged-in user **without**
+view access to that entry, and an editor simply browsing the live front end
+with no preview request. Only a genuine preview by someone entitled to see the
+entry is exempt.
 
 It does **not** automatically gate:
 
