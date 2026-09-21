@@ -19,17 +19,17 @@ async function run() {
   await login();
 
   // revoke on Lite -> works
-  const rv = await post('revoke-code', { codeId: C2 });
+  const rv = await post('revoke-code', { uid: RULE, codeId: C2 });
   t('Lite: revoke-code works', rv.json.ok === true && db(`SELECT revokedAt IS NOT NULL FROM sesame_rule_codes WHERE uid='${C2}';`) === '1', JSON.stringify(rv));
   // delete on Lite -> works
-  const dl = await post('delete-code', { codeId: C3 });
+  const dl = await post('delete-code', { uid: RULE, codeId: C3 });
   t('Lite: delete-code works', dl.json.ok === true && db(`SELECT COUNT(*) FROM sesame_rule_codes WHERE uid='${C3}';`) === '0', JSON.stringify(dl));
   // add a 2nd code on Lite -> rejected (Pro)
   const beforeCount = db(`SELECT COUNT(*) FROM sesame_rule_codes WHERE ruleUid='${RULE}';`);
   const ad = await post('add-code', { uid: RULE, password: 'nope', label: 'Nope' });
   t('Lite: add-code (2nd) is rejected', !!ad.json.error && db(`SELECT COUNT(*) FROM sesame_rule_codes WHERE ruleUid='${RULE}';`) === beforeCount, JSON.stringify(ad));
   // update on Lite -> Pro-gated (404 / not ok)
-  const up = await post('update-code', { codeId: C2, label: 'Renamed on Lite' });
+  const up = await post('update-code', { uid: RULE, codeId: C2, label: 'Renamed on Lite' });
   t('Lite: update-code is Pro-gated', up.status === 404 || up.json.ok !== true, `status=${up.status} ${JSON.stringify(up.json)}`);
 
   // edit screen lists codes on Lite, without the Add form

@@ -33,23 +33,23 @@ async function run() {
   t('add-code without password is rejected', codeCount() === c1 && r.error, `err=${r.error}`);
 
   // update-code (relabel + expiry)
-  await save({ _a: 'update-code', codeId: cid, label: 'District X (renamed)', expiresAt: '2032-02-02' });
+  await save({ _a: 'update-code', uid: RUID, codeId: cid, label: 'District X (renamed)', expiresAt: '2032-02-02' });
   t('update-code relabels', labelExists('District X (renamed)'));
   t('update-code sets expiry', db(`SELECT DATE(expiresAt) FROM sesame_rule_codes WHERE uid='${cid}';`) === '2032-02-02');
 
   // revoke-code (stamps revokedAt, keeps the row)
-  await save({ _a: 'revoke-code', codeId: cid });
+  await save({ _a: 'revoke-code', uid: RUID, codeId: cid });
   t('revoke-code stamps revokedAt (row kept)', db(`SELECT revokedAt IS NOT NULL FROM sesame_rule_codes WHERE uid='${cid}';`) === '1');
 
   // delete-code
   const c2 = codeCount();
-  await save({ _a: 'delete-code', codeId: cid });
+  await save({ _a: 'delete-code', uid: RUID, codeId: cid });
   t('delete-code removes the row', codeCount() === c2 - 1);
 
   // delete-code refuses the last (code one) — try deleting code one
   const codeOne = db(`SELECT uid FROM sesame_rule_codes WHERE ruleUid='${RUID}' ORDER BY dateCreated ASC LIMIT 1;`);
   const c3 = codeCount();
-  const del = await save({ _a: 'delete-code', codeId: codeOne });
+  const del = await save({ _a: 'delete-code', uid: RUID, codeId: codeOne });
   t('delete-code refuses the last code', codeCount() === c3 && del.error, `err=${del.error}`);
 
   // edit screen renders the Named codes section

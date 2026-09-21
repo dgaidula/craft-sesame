@@ -79,11 +79,15 @@ class GateController extends Controller
             throw new NotFoundHttpException(Craft::t('sesame', 'This link has expired or is no longer valid.'));
         }
 
-        // A rule link is minted PER CODE, and its code must still be active —
-        // so revoking or expiring that one code kills its links, independent of
-        // the rule epoch. A link with no code id is malformed.
+        // A rule link is minted PER CODE, and its code must still be active AND
+        // belong to this rule — so revoking or expiring that one code kills its
+        // links independent of the rule epoch, and a token whose codeId doesn't
+        // match the scope's rule is refused (defense in depth: the token is
+        // signed, so this only bites a tampered or stale value). No code id is
+        // malformed.
         $codeId = $data['codeId'];
-        if ($codeId === null || !Plugin::getInstance()->codes->isActive($codeId)) {
+        $code = $codeId !== null ? Plugin::getInstance()->codes->getByUid($codeId) : null;
+        if ($code === null || $code->ruleUid !== $scope->uid || !$code->isActive()) {
             throw new NotFoundHttpException(Craft::t('sesame', 'This link has expired or is no longer valid.'));
         }
 

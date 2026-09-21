@@ -520,17 +520,17 @@ document.addEventListener('click', function (e) {
             if (expInput.defaultValue && !expInput.value &&
                 !window.confirm({{ 'Clearing this code’s expiry re-validates everyone who held it. Continue?'|t('sesame')|json_encode|raw }})) { return; }
             out.textContent = {{ 'Saving…'|t('sesame')|json_encode|raw }};
-            post(URLS.update, { codeId: codeId, label: row.querySelector('.sesame-code-label').value, expiresAt: expInput.value })
+            post(URLS.update, { uid: ruleUid, codeId: codeId, label: row.querySelector('.sesame-code-label').value, expiresAt: expInput.value })
                 .then(function (d) { d.ok ? window.location.reload() : (out.textContent = d.error || {{ 'Couldn’t save.'|t('sesame')|json_encode|raw }}); });
         } else if (btn.classList.contains('sesame-code-revoke')) {
             // The primary password (the Password field above) is not in this list
             // and always keeps working, so revoking a listed code never fully
             // locks the rule; still confirm that this code's holders are cut off.
             if (!window.confirm({{ 'Revoke this code? Everyone holding it, and its links, are cut off. (The rule’s primary password still works.)'|t('sesame')|json_encode|raw }})) { return; }
-            post(URLS.revoke, { codeId: codeId }).then(function (d) { d.ok ? window.location.reload() : (out.textContent = d.error || 'Error'); });
+            post(URLS.revoke, { uid: ruleUid, codeId: codeId }).then(function (d) { d.ok ? window.location.reload() : (out.textContent = d.error || 'Error'); });
         } else if (btn.classList.contains('sesame-code-delete')) {
             if (!window.confirm({{ 'Delete this code for good?'|t('sesame')|json_encode|raw }})) { return; }
-            post(URLS.del, { codeId: codeId }).then(function (d) { d.ok ? window.location.reload() : (out.textContent = d.error || {{ 'Couldn’t delete.'|t('sesame')|json_encode|raw }}); });
+            post(URLS.del, { uid: ruleUid, codeId: codeId }).then(function (d) { d.ok ? window.location.reload() : (out.textContent = d.error || {{ 'Couldn’t delete.'|t('sesame')|json_encode|raw }}); });
         } else if (btn.classList.contains('sesame-code-link')) {
             out.textContent = {{ 'Minting…'|t('sesame')|json_encode|raw }};
             post(URLS.link, { uid: ruleUid, codeId: codeId }).then(function (d) {

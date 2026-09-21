@@ -7,6 +7,7 @@ use craft\helpers\DateTimeHelper;
 use craft\helpers\Db;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
+use iceboxind\sesame\models\Code;
 use iceboxind\sesame\models\Rule;
 use iceboxind\sesame\Plugin;
 use iceboxind\sesame\services\Branding;
@@ -252,12 +253,15 @@ class RulesController extends Controller
     /** PRO. Relabels a code and/or changes its expiry. */
     public function actionUpdateCode(): Response
     {
-        [$request] = $this->requireCodeManagement(false, true);
+        [$request, $ruleUid] = $this->requireCodeManagement(true, true);
+        $code = $this->resolveManagedCode($ruleUid, (string) $request->getRequiredBodyParam('codeId'));
+        if ($code === null) {
+            return $this->asJson(['error' => Craft::t('sesame', 'That code is no longer available.')]);
+        }
 
-        $codeId = (string) $request->getRequiredBodyParam('codeId');
         $codes = Plugin::getInstance()->codes;
-        $codes->relabel($codeId, trim((string) $request->getBodyParam('label', '')) ?: null);
-        $codes->setExpiry($codeId, $this->postedExpiry());
+        $codes->relabel($code->uid, trim((string) $request->getBodyParam('label', '')) ?: null);
+        $codes->setExpiry($code->uid, $this->postedExpiry());
 
         return $this->asJson(['ok' => true]);
     }
@@ -265,17 +269,49 @@ class RulesController extends Controller
     /** Revokes a code (cuts off its holders; the code stays listed as revoked). Every edition. */
     public function actionRevokeCode(): Response
     {
-        [$request] = $this->requireCodeManagement(false, false);
-        Plugin::getInstance()->codes->revoke((string) $request->getRequiredBodyParam('codeId'));
-        return $this->asJson(['ok' => true]);
+        [$request, $ruleUid] = $this->requireCodeManagement(true, false);
+        $code = $this->resolveManagedCode($ruleUid, (string) $request->getRequiredBodyParam('codeId'));
+        if ($code === null) {
+            return $this->asJson(['error' => Craft::t('sesame', 'That code is no longer available.')]);
+        }
+
+        return $this->asJson(['ok' => Plugin::getInstance()->codes->revoke($code->uid)]);
     }
 
     /** Deletes a code outright (refused for a rule's last/only code). Every edition. */
     public function actionDeleteCode(): Response
     {
-        [$request] = $this->requireCodeManagement(false, false);
-        $ok = Plugin::getInstance()->codes->delete((string) $request->getRequiredBodyParam('codeId'));
+        [$request, $ruleUid] = $this->requireCodeManagement(true, false);
+        $code = $this->resolveManagedCode($ruleUid, (string) $request->getRequiredBodyParam('codeId'));
+        if ($code === null) {
+            return $this->asJson(['error' => Craft::t('sesame', 'That code is no longer available.')]);
+        }
+
+        $ok = Plugin::getInstance()->codes->delete($code->uid);
         return $this->asJson($ok ? ['ok' => true] : ['error' => Craft::t('sesame', 'A rule must keep at least one code.')]);
+    }
+
+    /**
+     * Resolves a posted (rule uid, codeId) pair for the per-code update / revoke /
+     * delete actions to a NON-PRIMARY code of that rule, or null. Binds the code
+     * to the named rule (a crafted request can't act on another rule's code) and
+     * refuses "code one" — the rule's primary password, driven by the top
+     * Password field and never listed here — so it can't be revoked or deleted
+     * out from under that field, silently breaking the rule's main login.
+     */
+    private function resolveManagedCode(string $ruleUid, string $codeId): ?Code
+    {
+        $codes = Plugin::getInstance()->codes;
+        $code = $codes->getByUid($codeId);
+        if ($code === null || $code->ruleUid !== $ruleUid) {
+            return null;
+        }
+        $codeOne = $codes->codeOne($ruleUid);
+        if ($codeOne !== null && $codeOne->uid === $code->uid) {
+            return null;
+        }
+
+        return $code;
     }
 
     /**
