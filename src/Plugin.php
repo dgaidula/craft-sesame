@@ -24,6 +24,7 @@ use iceboxind\sesame\services\AccessLog;
 use iceboxind\sesame\services\Gate;
 use iceboxind\sesame\services\Rules;
 use iceboxind\sesame\services\Secrets;
+use iceboxind\sesame\services\StaticCache;
 use iceboxind\sesame\services\Throttle;
 use iceboxind\sesame\web\twig\PluginVariable;
 use yii\base\Event;
@@ -42,6 +43,7 @@ use yii\base\Event;
  * @property-read Gate $gate
  * @property-read Throttle $throttle
  * @property-read AccessLog $accessLog
+ * @property-read StaticCache $staticCache
  * @property-read Settings $settings
  */
 class Plugin extends BasePlugin
@@ -79,6 +81,7 @@ class Plugin extends BasePlugin
                 'gate' => Gate::class,
                 'throttle' => Throttle::class,
                 'accessLog' => AccessLog::class,
+                'staticCache' => StaticCache::class,
             ],
         ];
     }
@@ -103,6 +106,7 @@ class Plugin extends BasePlugin
         $this->registerSiteUrlRules();
         $this->registerCpUrlRules();
         $this->registerRequestGate();
+        $this->registerBlitzIntegration();
         $this->registerGarbageCollection();
     }
 
@@ -294,7 +298,20 @@ class Plugin extends BasePlugin
                 /** @var Entry $entry */
                 $entry = $event->sender;
                 $scope = $this->gate->isProtected($entry);
-                if ($scope === null || $this->gate->isUnlocked($scope)) {
+                if ($scope === null) {
+                    return;
+                }
+
+                // A protected URL must never be served from a static cache,
+                // whether the visitor is locked out or already unlocked (P0.1):
+                // a cached challenge ships a stale CSRF token, and a cached
+                // unlocked page is served to everyone with no password. Craft's
+                // no-cache headers cover the browser and reverse proxies; Blitz
+                // decides cacheability without reading headers and is handled
+                // separately in registerBlitzIntegration().
+                Craft::$app->getResponse()->setNoCacheHeaders();
+
+                if ($this->gate->isUnlocked($scope)) {
                     return;
                 }
 
@@ -303,6 +320,32 @@ class Plugin extends BasePlugin
                     'return' => $entry->url ?: $entry->uri,
                 ]];
                 $event->handled = true;
+            }
+        );
+    }
+
+    /**
+     * Static-cache safety with Blitz (P0.1). Vetoes Blitz on
+     * `EVENT_IS_CACHEABLE_REQUEST` for any protected URL — the single check
+     * that gates both serving a cached copy and writing a new one
+     * (`CacheRequestService::getIsCacheableRequest()`, called at
+     * `Application::EVENT_INIT`, before Sesame's own gate ever runs). Only
+     * registered when Blitz is installed; a no-op otherwise. Sesame has no
+     * hard dependency on Blitz.
+     */
+    private function registerBlitzIntegration(): void
+    {
+        if (!class_exists(\putyourlightson\blitz\Blitz::class)) {
+            return;
+        }
+
+        Event::on(
+            \putyourlightson\blitz\services\CacheRequestService::class,
+            \putyourlightson\blitz\services\CacheRequestService::EVENT_IS_CACHEABLE_REQUEST,
+            function (\craft\events\CancelableEvent $event): void {
+                if ($this->staticCache->currentRequestIsProtected()) {
+                    $event->isValid = false;
+                }
             }
         );
     }

@@ -11,6 +11,7 @@ use craft\helpers\StringHelper;
 use iceboxind\sesame\migrations\Install;
 use iceboxind\sesame\models\Rule;
 use iceboxind\sesame\models\Scope;
+use iceboxind\sesame\Plugin;
 
 /**
  * Reads/writes {{%sesame_rules}} and matches the current entry against them.
@@ -87,6 +88,7 @@ class Rules extends Component
         }
 
         $this->rules = null;
+        $this->purgeStaticCache();
         return true;
     }
 
@@ -99,6 +101,7 @@ class Rules extends Component
 
         Craft::$app->getDb()->createCommand()->delete(Install::RULES_TABLE, ['id' => $rule->id])->execute();
         $this->rules = null;
+        $this->purgeStaticCache();
         return true;
     }
 
@@ -115,7 +118,23 @@ class Rules extends Component
         }
 
         $this->rules = null;
+        $this->purgeStaticCache();
         return true;
+    }
+
+    /**
+     * Any rule change can flip a URL between public and protected, so drop the
+     * static cache (P0.1). This is a BACKSTOP, not the primary defense: the
+     * cacheable-request veto ({@see \iceboxind\sesame\services\StaticCache})
+     * already refuses to serve a protected URL from cache. It matters only for
+     * a section/entry-type rule on a page cached before the rule existed, if
+     * the matched element isn't resolvable when the veto runs. No-op without
+     * Blitz; a full clear is the honest fallback since a glob/section/type
+     * rule's affected URIs aren't enumerable here.
+     */
+    private function purgeStaticCache(): void
+    {
+        Plugin::getInstance()->staticCache->purgeAll();
     }
 
     /**
@@ -146,6 +165,29 @@ class Rules extends Component
         }
 
         return null;
+    }
+
+    /**
+     * Element-free protection check for a request path: true if any enabled
+     * URI-pattern rule matches. Used by the static-cache veto
+     * ({@see \iceboxind\sesame\services\StaticCache}) at a point in the request
+     * lifecycle where the matched element may not be resolvable yet. Section /
+     * entry-type / per-entry protection needs the element, so those are covered
+     * by the element path in the veto, not here.
+     */
+    public function uriIsProtected(string $uri): bool
+    {
+        if ($uri === '') {
+            return false;
+        }
+
+        foreach ($this->all() as $rule) {
+            if ($rule->enabled && $rule->matchType === 'uri' && $this->matchesUri($rule->pattern, $uri)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function currentPathInfo(): string

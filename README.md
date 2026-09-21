@@ -210,6 +210,35 @@ as the site builder's responsibility: keep protected content out of
 sitemaps, feeds, and public GraphQL schemas by your own template/schema
 choices.
 
+## Static caching
+
+A protected URL must never be served from a static full-page cache: a cached
+challenge would ship a stale CSRF token, and a cached *unlocked* page would be
+handed to everyone with no password. Sesame handles this on both editions.
+
+- Every protected page view — locked **or** unlocked — is sent with no-cache
+  headers, which covers the browser and reverse proxies.
+
+- **Blitz** decides cacheability without reading response headers, so Sesame
+  integrates with it directly, vetoing Blitz's `EVENT_IS_CACHEABLE_REQUEST` for
+  any protected URL. That one check gates both *writing* a cache entry and
+  *serving* one (Blitz consults it at `Application::EVENT_INIT`, before Sesame's
+  gate runs), so a protected page is never cached and a page cached *before* it
+  became protected stops being served. The integration is guarded — Sesame has
+  no dependency on Blitz and does nothing if it isn't installed. A rule change
+  also clears the Blitz cache as a backstop.
+
+> **Blitz server-rewrite / reverse-proxy delivery.** When Blitz serves cache
+> files straight from the web server (nginx/Apache rewrites, or a CDN), PHP
+> never runs on a cache hit, so no plugin — Sesame included — can intercept it.
+> In that mode, also add your protected URI patterns to Blitz's
+> `excludedUriPatterns`, so those URLs are never written to the file cache in
+> the first place.
+
+Other full-page caches — Craft's own `{% cache %}` tags, `httpcache`, a CDN —
+are the site builder's responsibility: don't wrap a protected entry's template
+in a cache shared across visitors.
+
 ## Development
 
 See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for architecture and the local
