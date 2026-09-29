@@ -22,16 +22,21 @@
                 </thead>
                 <tbody>
                     {% for uid, rule in rules %}
+                        {% set targetName = targets[uid] ?? null %}
                         {% set target = {
                             uri: 'URI: ' ~ rule.pattern,
-                            section: 'Section: ' ~ rule.pattern,
-                            entryType: 'Entry type: ' ~ rule.pattern,
+                            section: 'Section: ' ~ targetName,
+                            entryType: 'Entry type: ' ~ targetName,
                         }[rule.matchType] ?? rule.pattern %}
                         <tr>
                             <th scope="row">
                                 <a href="{{ url('sesame/rules/' ~ uid) }}">{{ rule.label }}</a>
                             </th>
-                            <td><code>{{ target }}</code></td>
+                            {% if rule.matchType != 'uri' and targetName is null %}
+                                <td class="error">{{ 'Deleted — this rule protects nothing'|t('sesame') }}</td>
+                            {% else %}
+                                <td><code>{{ target }}</code></td>
+                            {% endif %}
                             <td>
                                 {% if rule.enabled %}
                                     <span class="status enabled"></span>{{ 'Enabled'|t('sesame') }}

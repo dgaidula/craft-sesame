@@ -16,7 +16,7 @@ use yii\web\Response;
 
 /**
  * CP screen for the rule set — the "no template code" way to protect a page
- * (a URI glob, or a section/entry-type handle) behind a shared password.
+ * (a URI glob, or a whole section / entry type, tracked by UID) behind a shared password.
  * This is the plugin's main CP section; the per-entry Protect field is
  * configured on the entry itself (`fields/Protect` + `_field/protect-input.twig`),
  * not here.
@@ -35,8 +35,13 @@ class RulesController extends Controller
 
     public function actionIndex(): Response
     {
+        $rules = Plugin::getInstance()->rules;
+
         return $this->renderTemplate('sesame/rules/index', [
-            'rules' => Plugin::getInstance()->rules->all(),
+            'rules' => $rules->all(),
+            // Section / entry-type rules store a UID; show the target's current
+            // name instead, or null when it has been deleted.
+            'targets' => array_map(static fn($rule) => $rules->targetLabel($rule), $rules->all()),
         ]);
     }
 
@@ -117,6 +122,17 @@ class RulesController extends Controller
 
         // Did this save change WHAT the rule protects (not just its password)?
         $targetChanged = $rule->matchType !== $storedMatchType || $rule->pattern !== $storedPattern;
+
+        // A section / entry-type rule stores its target's UID (see
+        // Rules::ruleMatches). Reject one that doesn't resolve, so a stale or
+        // hand-posted value can't save a rule that silently protects nothing.
+        // Only checked when the target is being set: an existing rule whose
+        // section was since deleted can still be renamed, disabled, or rotated.
+        if (($isNew || $targetChanged) && $rule->matchType !== 'uri' && Plugin::getInstance()->rules->target($rule) === null) {
+            $rule->addError('pattern', $rule->matchType === 'section'
+                ? Craft::t('sesame', 'Choose a section.')
+                : Craft::t('sesame', 'Choose an entry type.'));
+        }
 
         // Lite AUTHORING gate (P0.5). Pattern rules — a `*` wildcard, a whole
         // section, or a whole entry type — are a Pro feature; Lite keeps exact-URI
@@ -490,17 +506,34 @@ class RulesController extends Controller
             }
         }
 
+        // Labelled “Name (handle)”: names aren't unique (two entry types can both
+        // be “Page”), and picking the wrong one leaves the intended pages public.
         $sectionOptions = array_map(
-            static fn($section) => ['label' => $section->name, 'value' => $section->handle],
+            static fn($section) => ['label' => "{$section->name} ({$section->handle})", 'value' => $section->uid],
             $entries->getAllSections()
         );
         $entryTypeOptions = array_map(
-            static fn($entryType) => ['label' => $entryType->name, 'value' => $entryType->handle],
+            static fn($entryType) => ['label' => "{$entryType->name} ({$entryType->handle})", 'value' => $entryType->uid],
             $entries->getAllEntryTypes()
         );
 
+        // A section / entry-type rule whose target was deleted: offer its stored
+        // value as a “deleted” option so the form posts it back unchanged — the
+        // rule can still be renamed, disabled, or re-passworded without being
+        // forced to retarget first.
+        $targetLabel = Plugin::getInstance()->rules->targetLabel($rule);
+        if ($rule->uid !== null && $rule->matchType !== 'uri' && $targetLabel === null) {
+            $missing = ['label' => Craft::t('sesame', '(deleted — protects nothing)'), 'value' => $rule->pattern];
+            if ($rule->matchType === 'section') {
+                $sectionOptions[] = $missing;
+            } else {
+                $entryTypeOptions[] = $missing;
+            }
+        }
+
         return $this->renderTemplate('sesame/rules/_edit', [
             'rule' => $rule,
+            'targetLabel' => $targetLabel,
             'isNew' => $rule->uid === null,
             'sectionOptions' => $sectionOptions,
             'entryTypeOptions' => $entryTypeOptions,

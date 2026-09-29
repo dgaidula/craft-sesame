@@ -77,6 +77,7 @@ runShell('p2-codes', 'p2-codes-test.php');
 runShell('p3-branding', 'p3-branding-test.php');
 runShell('draft-flow', 'draft-flow-test.php');
 runShell('p1-schedule', 'p1-schedule-test.php');
+runShell('section-uid', 'section-uid-test.php'); // 1.0.1: section/entry-type rules keyed by UID
 
 console.log('\n— HTTP suites (node) —');
 // Baseline gate + revocation (lite).
@@ -118,6 +119,10 @@ reseed(); setEdition('pro');
 runNode('pro-epoch', 'pro-epoch-test.mjs');
 reseed();
 runNode('p3-http', 'p3-http-test.mjs');
+
+// 1.0.1 UID-keyed section/entry-type rules through the CP save + list (Pro).
+reseed(); setEdition('pro');
+runNode('section-uid-http', 'section-uid-http-test.mjs');
 
 // preview-test needs a validly-signed x-craft-preview token, which can't be
 // minted over raw HTTP — run it by hand from a browser CP preview if needed.

@@ -39,7 +39,7 @@ class Install extends Migration
                 'sortOrder' => $this->smallInteger()->notNull()->defaultValue(0),
                 'label' => $this->string()->notNull(),
                 'matchType' => $this->string(20)->notNull(), // uri | section | entryType
-                'pattern' => $this->string()->notNull(),
+                'pattern' => $this->string()->notNull(), // URI pattern, or the section / entry-type UID
                 'message' => $this->text(),
                 'templateOverride' => $this->string(),
                 // Per-rule branding overrides (P1.3, Pro): null = inherit the

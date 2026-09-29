@@ -8,6 +8,8 @@ use craft\db\Query;
 use craft\elements\Entry;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
+use craft\models\EntryType;
+use craft\models\Section;
 use iceboxind\sesame\migrations\Install;
 use iceboxind\sesame\models\Rule;
 use iceboxind\sesame\models\Scope;
@@ -225,12 +227,19 @@ class Rules extends Component
         return false;
     }
 
-    /** The pure match test for one rule against an entry — no enabled/schedule checks. */
+    /**
+     * The pure match test for one rule against an entry — no enabled/schedule checks.
+     *
+     * Section and entry-type rules store the target's UID, never its handle: a
+     * handle can be renamed in the CP at any time, and a handle-keyed rule would
+     * then silently stop matching — the protected pages would go public with no
+     * warning. The UID survives renames and travels with project config.
+     */
     private function ruleMatches(Rule $rule, Entry $entry, string $uri, string $pathInfo): bool
     {
         return match ($rule->matchType) {
-            'section' => ($section = $entry->getSection()) !== null && $section->handle === $rule->pattern,
-            'entryType' => $entry->getType()->handle === $rule->pattern,
+            'section' => ($section = $entry->getSection()) !== null && $section->uid === $rule->pattern,
+            'entryType' => $entry->getType()->uid === $rule->pattern,
             'uri' => $this->matchesUri($rule->pattern, $uri) || $this->matchesUri($rule->pattern, $pathInfo),
             default => false,
         };
@@ -290,6 +299,34 @@ class Rules extends Component
         }
 
         return (bool) preg_match($regex, $uri);
+    }
+
+    /**
+     * The section or entry type a rule targets, resolved from its stored UID —
+     * null when the rule is a URI rule or its target no longer exists (deleted),
+     * in which case the rule protects nothing.
+     */
+    public function target(Rule $rule): Section|EntryType|null
+    {
+        $entries = Craft::$app->getEntries();
+
+        return match ($rule->matchType) {
+            'section' => $entries->getSectionByUid($rule->pattern),
+            'entryType' => $entries->getEntryTypeByUid($rule->pattern),
+            default => null,
+        };
+    }
+
+    /**
+     * “Name (handle)” for a rule's section / entry type — names aren't unique
+     * (two entry types can both be called “Page”), handles are. Null when the
+     * target no longer exists.
+     */
+    public function targetLabel(Rule $rule): ?string
+    {
+        $target = $this->target($rule);
+
+        return $target ? "{$target->name} ({$target->handle})" : null;
     }
 
     private function rowToRule(array $row): Rule

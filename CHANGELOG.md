@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.0.1 - 2026-09-28
+
+### Fixed
+
+- **Section and entry-type rules survive a handle rename.** They now store the
+  section's or entry type's UID instead of its handle. In 1.0.0, renaming that
+  handle in the control panel made the rule stop matching, so every page it
+  protected became public without warning. A migration converts existing rules
+  (run `php craft up` after updating).
+- **Entry-type rules now cover every entry of that type**, including entries in
+  a section that overrides the entry type's handle. In 1.0.0 those entries
+  were missed, so they may become protected after updating — check which
+  pages each entry-type rule covers.
+- Saving a section or entry-type rule now rejects a target that doesn't exist.
+- The section and entry-type pickers and the Rules list label each target as
+  “Name (handle)”, since names aren't unique (two entry types can both be
+  “Page”). The Rules list flags a rule whose target has been deleted (it
+  protects nothing); such a rule can still be renamed, disabled, or given a
+  new password.
+
 ## 1.0.0 - 2026-09-21
 
 First public release. Password-protect Craft pages with no template code —

@@ -90,9 +90,10 @@ Sesame offers two independent ways to protect a page — use either, or both:
 - **Sesame → Rules** — a control-panel section backed by the plugin’s own
   table, so rules stay editable on production even with `allowAdminChanges`
   off. A rule matches an exact URI (`partners/handbook`); on Pro it can also
-  match a `*` pattern (`partners/*`), a section handle, or an entry-type
-  handle. Each rule carries its own password, an optional prompt message, and
-  an optional template override. This is the zero-field-layout way to gate a
+  match a `*` pattern (`partners/*`), a whole section, or a whole entry
+  type — tracked by UID, so renaming its handle never unprotects it. Each
+  rule carries its own password, an optional prompt message, and an
+  optional template override. This is the zero-field-layout way to gate a
   page, and the one to reach for first: it needs no changes to the entries
   themselves.
 - **Sesame Protection field** — add the field to an entry type’s layout,

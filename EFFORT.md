@@ -109,3 +109,16 @@ Fresh session opened IN this repo. Audited notes vs git log + tree first (all ac
 - **Key finding:** the "only tests in a scratch dir" risk was real AND the recovered suites had rotted against the P1.2 named-codes refactor (Rule.secret removed, per-code magic links) — they had not been re-run since P1.1/P1.2. Recovering them meant fixing that drift, not just copying. The one-command `run-all.mjs` is the durable guard against both (location + silent order/arg dependence).
 - **No subagents spawned:** the work was sequential audit→surgical-fix→test with high context; each fix was <40 lines in 1–2 files (self-made per casting). The contrast-threshold math was validated with a standalone script (objective) and every fix by a green harness suite updated to assert the new contract, in lieu of a fresh-context review (gate subagent unavailable this session; verifier reserved for cross-project load-bearing work).
 - **REMAINING = §5 publish** (outward, Dan's decisions): gh repo create + push + tag 1.0.0; Packagist submit + hook; Craft Console (Icebox org) editions/pricing $49+$19/screenshots/listing; Downtoll goes first if it hasn't. Testbed left at the reseeded resting state (lite, page-one rule, code one 'letmein').
+
+### 2026-09-28 — 1.0.1: section/entry-type rules keyed by UID (from the CAF/TLB install shakedown)
+Found during the Chef Ann install shakedown (1.0.0 installed Pro on CAF + TLB, live smoke 29/29 each): a section / entry-type rule stored the HANDLE, so renaming it in the CP silently unprotected every page (fail-open). Single orchestrator Opus 5.5 (1M)[high], fable-mode.
+
+| Pass | Agent | Role | Scope | Duration | Tokens | Tool calls | Outcome |
+|---|---|---|---|---|---|---|---|
+| Fix + suites | Opus 5.5 (session) | builder/orchestrator | ruleMatches by UID, `Rules::target()`, save-time validation, list/picker names, migration m260928 (handle→UID, idempotent), schemaVersion 1.0.1; new `section-uid-test.php` (15) + `section-uid-http-test.mjs` (10) | ~35 min (wall-clock estimate) | — | — | success |
+| Adversarial review | `gate` (Opus 5.5 xhigh) | verifier | read-only diff review | 450 s | 168,666 | 40 | PASS WITH FOLLOW-UPS — 6 findings |
+| Follow-ups | Opus 5.5 (session) | builder | “Name (handle)” labels (duplicate “Page” entry types on both client sites); migration maps per-section handle OVERRIDES + purges static cache; deleted-target rule stays editable on Pro; Lite locked view shows name; stale docblocks; suites → 16 + 14 | ~20 min (wall-clock estimate) | — | — | success |
+| Verify | Opus 5.5 (session) | verifier | mutation test (revert matcher → 5 FAIL); full harness | — | — | — | 201/201 across 19 suites |
+
+- **Flake logged:** one full run had `entry-epoch` fail “disable => entry not protected” (1/14); it passed 3/3 standalone and the next full run was 201/201. That suite doesn't touch the changed code. Earlier the same day a first-suite `throttle-svc` produced NO RESULT once, then 8/8. Both are first-suites-in-run flakes; worth a look if they recur.
+- Deploy note for existing installs: `php craft up` runs the migration, then commit `project.yaml` at `schemaVersion: 1.0.1` — a stale 1.0.0 in YAML makes `project-config/apply` refuse.

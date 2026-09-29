@@ -25,7 +25,7 @@ class Rule extends Model
     /** @var 'uri'|'section'|'entryType' */
     public string $matchType = 'uri';
 
-    /** A URI glob (`members`, `members/*`), or a section/entry-type handle. */
+    /** A URI glob (`members`, `members/*`), or a section / entry-type UID (never a handle — see Rules::ruleMatches). */
     public string $pattern = '';
 
     // The rule's secret(s) are NOT stored here any more — they are rows in

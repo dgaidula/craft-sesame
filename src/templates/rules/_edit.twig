@@ -39,7 +39,7 @@
         <div class="field">
             <div class="heading"><label>{{ 'Protects'|t('sesame') }}</label></div>
             <div class="input">
-                <p>{{ protectsLabel }}: <code>{{ rule.pattern }}</code></p>
+                <p>{{ protectsLabel }}: <code>{{ rule.matchType == 'uri' ? rule.pattern : (targetLabel ?? '(deleted — protects nothing)'|t('sesame')) }}</code></p>
                 <p class="light">{{ 'This is a pattern rule — a Sesame Pro feature. You can change its password, enable/disable it, or delete it here; editing what it protects requires Sesame Pro.'|t('sesame') }}</p>
             </div>
         </div>
