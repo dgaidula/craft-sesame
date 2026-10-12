@@ -177,8 +177,10 @@ Pro adds the tools for running access, not just setting it.
 - **Branding the password screen.** At **Sesame → Branding**, set a site-wide
   logo, heading, intro copy, and accent colour for the default screen; any rule
   can override each of them on its own edit screen (its Custom message is the
-  per-rule intro). Stored in the plugin’s own table, so it stays editable on
-  production with `allowAdminChanges` off. It restyles the *built-in* screen —
+  per-rule intro). The heading also names the browser tab (“Heading — Password
+  required”); unset, both fall back to the Craft site name. Stored in the
+  plugin’s own table, so it stays editable on production with
+  `allowAdminChanges` off. It restyles the *built-in* screen —
   a full template override (below) still trumps it — and the accent is
   validated to a safe CSS colour. Set nothing and you get Sesame’s default look.
 

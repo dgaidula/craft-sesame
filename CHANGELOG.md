@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.0.2 - 2026-10-12
+
+### Changed
+
+- **The password screen’s browser-tab title follows the Branding heading.** It
+  read “<Craft site name> — Password required” even when a heading was set, so a
+  site whose internal name differs from its public one (or one site of several)
+  showed the internal name in the tab. The title now uses the same heading as the
+  on-screen label — per-rule, then site default, then the Craft site name.
+
 ## 1.0.1 - 2026-09-28
 
 ### Fixed

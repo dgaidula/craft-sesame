@@ -7,12 +7,15 @@
    override" field. Either way, keep the form contract below intact — the
    `#sesame-password` id is depended on by the plugin's own tests. #}
 <!doctype html>
+{# The screen's name: the Branding heading (per-rule ?? site default) when set, else the Craft site name.
+   Used for both the visible label and the browser-tab title, so the two never disagree. #}
+{% set siteLabel = (brandHeading is defined and brandHeading) ? brandHeading : craft.app.sites.currentSite.name %}
 <html lang="{{ craft.app.language }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <title>{{ craft.app.sites.currentSite.name }} — {{ 'Password required'|t('sesame') }}</title>
+    <title>{{ siteLabel }} — {{ 'Password required'|t('sesame') }}</title>
     <style>
         :root {
             --sesame-ground: #f5f4f1;
@@ -218,7 +221,7 @@
             </svg>
         {% endif %}
 
-        <p class="sesame-site">{{ (brandHeading is defined and brandHeading) ? brandHeading : craft.app.sites.currentSite.name }}</p>
+        <p class="sesame-site">{{ siteLabel }}</p>
         <p class="sesame-message">{{ message }}</p>
 
         <form class="sesame-form" method="post" action="{{ actionUrl('sesame/gate/unlock') }}">

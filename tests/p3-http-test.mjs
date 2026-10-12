@@ -26,18 +26,22 @@ const siteAccent = () => sh(P + "echo 'A='.var_export($p->branding->siteDefaults
 
 async function run() {
   let pass = 0, fail = 0;
+  const title = (html) => (/<title>([^<]*)<\/title>/.exec(html) || [])[1] || '';
   const t = (n, c, d = '') => c ? (pass++, console.log(`  PASS  ${n}`)) : (fail++, console.log(`  FAIL  ${n}  ${d}`));
 
   // 1. no branding => built-in (no injected accent var override)
   setSite(null, null, null); setRuleBrand(null, null); cc();
   let h = await challenge();
   t('1. no branding: no custom accent injected', !/--sesame-accent:\s*#ff8800/.test(h) && !/Members Only/.test(h));
+  const siteName = (/<p class="sesame-site">([^<]*)<\/p>/.exec(h) || [])[1] || '';
+  t('1. no branding: tab title uses the site name (1.0.2)', siteName !== '' && title(h).startsWith(siteName + ' — '), title(h));
 
   // 2. site-default branding shows on the challenge
   setSite('Members Only', 'Enter the shared code.', '#ff8800'); cc();
   h = await challenge();
   t('2. site accent injected', /--sesame-accent:\s*#ff8800/.test(h));
   t('2. site heading shown', />Members Only</.test(h));
+  t('2. tab title follows the site heading (1.0.2)', title(h).startsWith('Members Only — '), title(h));
   t('2. site intro shown', /Enter the shared code\./.test(h));
 
   // 3. per-rule override wins
@@ -45,6 +49,7 @@ async function run() {
   h = await challenge();
   t('3. per-rule accent overrides site', /--sesame-accent:\s*#0000ff/.test(h) && !/--sesame-accent:\s*#ff8800/.test(h));
   t('3. per-rule heading overrides site', />Board Portal</.test(h));
+  t('3. tab title follows the per-rule heading (1.0.2)', title(h).startsWith('Board Portal — '), title(h));
 
   // 4. Branding CP screen (Pro) renders + saves + sanitizes the accent
   proEdition(true); cc();

@@ -76,7 +76,7 @@ node ~/sw/github-public/craft-sesame/tests/run-all.mjs
 between suites (they are not isolated: several mutate the password, epoch,
 edition, or rule set), sets the edition each suite needs, seeds the rule/code
 uids the code and schedule drivers take as arguments, runs every suite, and
-prints a per-suite ✓/✗ and a grand total. Last green run: **201 passed, 0
+prints a per-suite ✓/✗ and a grand total. Last green run: **204 passed, 0
 failed across 19 suites**. It exits non-zero on any failure. `reseed.php` is the
 baseline it (and you) can apply by hand between individual runs.
 
@@ -145,7 +145,7 @@ you change behaviour.
 | `p2-ui-test.mjs` | HTTP | code-management CP actions + the edit-screen code list render (Pro) | 9 |
 | `p2fix-test.mjs` | HTTP | Lite can revoke/delete existing codes; add + relabel/expiry stay Pro | 7 |
 | `p3-branding-test.php` | logic | branding resolve (per-rule ?? site ?? null) + `sanitizeAccent` | 19 |
-| `p3-http-test.mjs` | HTTP | challenge reflects site + per-rule branding; Branding CP screen saves (Pro) | 8 |
+| `p3-http-test.mjs` | HTTP | challenge reflects site + per-rule branding (label and, since 1.0.2, the tab title); Branding CP screen saves (Pro) | 11 |
 | `draft-flow-test.php` | logic | provisional-draft autosave: secret follows the draft, reconciles to canonical on apply, orphan GC | 12 |
 | `section-uid-test.php` | logic | 1.0.1: handle→UID migration (idempotent); section + entry-type rules keep matching across a handle rename; per-section override handle; deleted target matches nothing | 16 |
 | `section-uid-http-test.mjs` | HTTP | 1.0.1: CP save accepts a UID, rejects a handle or unknown UID; list shows names + flags a deleted target; “Name (handle)” labels; deleted-target rule still editable; Lite locked view; rule gates the front end (Pro) | 14 |
