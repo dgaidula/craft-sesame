@@ -22,8 +22,8 @@ any more: Dan settled the Lite line and the vendor (`iceboxind/`, repos at `dgai
 - [ ] **0.** `git init` this repo and `craft-plugin-base` and commit the current state, so every change below is its own reviewable commit. **Then move the vendor to `iceboxind`** as the first change, with the tool built for it — dry run, read the output, then apply:
 
   ```
-  node ~/sw/github-public/craft-plugin-base/bin/rename-vendor.mjs --plugin ~/sw/github-public/craft-sesame --from dgaidula --to iceboxind
-  node ~/sw/github-public/craft-plugin-base/bin/rename-vendor.mjs --plugin ~/sw/github-public/craft-sesame --from dgaidula --to iceboxind --write
+  node ~/sw/github-private/craft-plugin-base/bin/rename-vendor.mjs --plugin ~/sw/github-public/craft-sesame --from dgaidula --to iceboxind
+  node ~/sw/github-private/craft-plugin-base/bin/rename-vendor.mjs --plugin ~/sw/github-public/craft-sesame --from dgaidula --to iceboxind --write
   ```
 
   It renames the package and the namespace (43 `namespace`/`use` lines) and **leaves every `github.com/dgaidula/craft-sesame` URL alone** — the repo stays under `dgaidula`. It will warn that `fields/Protect.php` is a class Craft persists in project config: Sesame has never been released or deployed — its only install was the local DDEV of a client site used as the test host — so **no upgrade migration is needed**: uninstall and reinstall there (`composer.json` `require` key → `iceboxind/craft-sesame`, `composer reinstall`). **That host is a client’s repo.** It was verified clean of Sesame on 2026-09-17 (no `require`, no project-config entries); keep it that way — never commit Sesame’s `composer.json`, `composer.lock`, or `config/project` changes there, and uninstall when a test session ends. Lint with `/opt/homebrew/bin/php -l` (a bare `php` inside a script is MAMP’s 7.4 on this machine) and re-run the gate HTTP test. Downtoll went through the same move on 2026-09-17 and is the worked example, including the migration Sesame does not need.
