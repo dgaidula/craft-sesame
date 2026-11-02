@@ -99,7 +99,7 @@ Fresh session opened IN this repo. Audited notes vs git log + tree first (all ac
 
 | Pass | Scope | Outcome |
 |---|---|---|
-| Harness recovery | Located the harness in the FVD-Chef-Ann client session scratchpad (session a92a4b9d, all 8+ suites); brought 25 files into `tests/` with a README, dropped the 2 client-host scripts (superseded), parameterized the admin password behind CRAFT_ADMIN_PW | done — `9789734` |
+| Harness recovery | Located the harness in a client session’s scratchpad (all 8+ suites); brought 25 files into `tests/` with a README, dropped the 2 client-host scripts (superseded), parameterized the admin password behind CRAFT_ADMIN_PW | done — `9789734` |
 | Fix list (§1 2026-09-20 review) | 4 commits, one per finding cluster: MEDIUM expiry tz-drift (`d0bd017`); LOW accent contrast/length/array (`ae81001`); LOW logo-id validation + site-heading cap + wire heading error (`a4f0ea4`); LOW/INFO per-code rule binding + code-one protection + revoke bool + magic-link code binding (`83fd963`) | done — all 8 findings addressed; throttle-null read left as the deferred-to-P2 DB-counter item, challenge.twig test citation now accurate |
 | Harness runnable + green | Fixed pre-P1.2 staleness in 4 seeders (Rule.secret → Codes::add; 3-arg → 4-arg signMagicLink); added `reseed.php` + `run-all.mjs` (one-command orchestrator, reseeds/editions/args each suite) | done — `b3acf32`/`434f22a`; **171 passed, 0 failed across 17 suites** |
 | Live matrix (§3) | Testbed bind-mounts this repo (`docker-compose.sesame.yaml`), so it ran HEAD live. Full harness green covers Lite↔Pro flip, per-entry draft flow (draft-flow 12/12), expiry round-trip (validated under LA tz via p2-ui localDate), downgrade (p2fix/item5/p1-authoring). **Not run live:** Blitz both-modes (the documented rabbit hole — caching never reproduced in any env; veto is unit-proven), preview raw-HTTP (needs a signed token), browser CP draft flow (1Password-blocked historically) | substantially done; 3 known-hard live gaps documented |
@@ -111,7 +111,7 @@ Fresh session opened IN this repo. Audited notes vs git log + tree first (all ac
 - **REMAINING = §5 publish** (outward, Dan's decisions): gh repo create + push + tag 1.0.0; Packagist submit + hook; Craft Console (Icebox org) editions/pricing $49+$19/screenshots/listing; Downtoll goes first if it hasn't. Testbed left at the reseeded resting state (lite, page-one rule, code one 'letmein').
 
 ### 2026-09-28 — 1.0.1: section/entry-type rules keyed by UID (from the CAF/TLB install shakedown)
-Found during the Chef Ann install shakedown (1.0.0 installed Pro on CAF + TLB, live smoke 29/29 each): a section / entry-type rule stored the HANDLE, so renaming it in the CP silently unprotected every page (fail-open). Single orchestrator Opus 5.5 (1M)[high], fable-mode.
+Found during a client install shakedown (1.0.0 installed Pro on two client sites, live smoke 29/29 each): a section / entry-type rule stored the HANDLE, so renaming it in the CP silently unprotected every page (fail-open). Single orchestrator Opus 5.5 (1M)[high], fable-mode.
 
 | Pass | Agent | Role | Scope | Duration | Tokens | Tool calls | Outcome |
 |---|---|---|---|---|---|---|---|
